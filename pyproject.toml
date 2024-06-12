@@ -10,7 +10,7 @@ authors = [
 maintainers = [
   { name="Timo Diepers", email="timo.diepers@ltt.rwth-aachen.de" }
 ]
-description = "Collection of dynamic characterization functions for life cycle inventories"
+description = "Collection of dynamic characterization functions for life cycle inventories with temporal information"
 readme = "README.md"
 dynamic = ["version"]
 # Add here all kinds of additional classifiers as defined under

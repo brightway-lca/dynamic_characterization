@@ -11,11 +11,10 @@
 hidden:
 maxdepth: 1
 ---
-self
 content/usage
 content/api/index
-content/codeofconduct
-content/contributing
+Code of Conduct <content/codeofconduct>
+Contributing <content/contributing>
 content/license
-content/changelog
+Changelog <content/changelog>
 ```
