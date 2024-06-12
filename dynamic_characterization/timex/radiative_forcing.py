@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import bw2data as bd
 
 
 def IRF_co2(year) -> callable:

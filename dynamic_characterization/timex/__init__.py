@@ -1,5 +1,5 @@
 """
-Collection of dynamic characterization functions for life cycle inventories with temporal information.
+Dynamic characterization functions from the bw_timex package (https://github.com/brightway-lca/bw_timex).
 """
 
 __all__ = (
