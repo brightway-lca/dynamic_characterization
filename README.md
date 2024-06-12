@@ -19,7 +19,7 @@
 [pre-commit]: https://github.com/pre-commit/pre-commit
 [black]: https://github.com/psf/black
 
-This is a collection of dynamic characterization function for life cycle inventories with temporal information. The functions are meant to work with a common input format of the dynamic inventory, collected in a pandas DataFrame that looks like this:
+This is a collection of dynamic characterization functions for life cycle inventories with temporal information. The functions are meant to work with a common input format of the dynamic inventory, collected in a pandas DataFrame that looks like this:
 
 | date | amount | flow | activity |
 |-------|-------|------|----------|
