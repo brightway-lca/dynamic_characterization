@@ -13,7 +13,7 @@
 [![Black](https://img.shields.io/badge/code%20style-black-000000.svg)][black]
 
 [pypi status]: https://pypi.org/project/dynamic_characterization/
-[read the docs]: https://dynamic_characterization.readthedocs.io/
+[read the docs]: https://dynamic-characterization.readthedocs.io/
 [tests]: https://github.com/TimoDiepers/dynamic_characterization/actions?workflow=Tests
 [codecov]: https://app.codecov.io/gh/TimoDiepers/dynamic_characterization
 [pre-commit]: https://github.com/pre-commit/pre-commit
