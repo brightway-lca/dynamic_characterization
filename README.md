@@ -19,6 +19,24 @@
 [pre-commit]: https://github.com/pre-commit/pre-commit
 [black]: https://github.com/psf/black
 
+This is a collection of dynamic characterization function for life cycle inventories with temporal information. The functions expect  a common input format of the "dynamic inventory", collected in a pandas DataFrame that looks like this:
+
+| date | amount | flow | activity |
+|-------|-------|------|----------|
+| 101   | 33    | 1    | 2        |
+| 312   | 21    | 4    | 2        |
+
+Characterization functions take in one row of the dynamic inventory dataframe (i.e. one emission at one point in time) and transform it. The output for a very simple function could look like:
+
+| date | amount | flow | activity |
+|------|--------|------|----------|
+| 101  | 33     | 1    | 2        |
+| 102  | 31     | 1    | 2        |
+| 103  | 31     | 1    | 2        |
+| 312  | 21     | 4    | 2        |
+| 313  | 20     | 4    | 2        |
+| 314  | 19     | 4    | 2        |
+
 ## Installation
 
 You can install _dynamic_characterization_ via [pip] from [PyPI]:
