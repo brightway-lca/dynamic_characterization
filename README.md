@@ -1,23 +1,9 @@
 # dynamic_characterization
 
-[![PyPI](https://img.shields.io/pypi/v/dynamic_characterization.svg)][pypi status]
-[![Status](https://img.shields.io/pypi/status/dynamic_characterization.svg)][pypi status]
-[![Python Version](https://img.shields.io/pypi/pyversions/dynamic_characterization)][pypi status]
-[![License](https://img.shields.io/pypi/l/dynamic_characterization)][license]
-
-[![Read the documentation at https://dynamic_characterization.readthedocs.io/](https://img.shields.io/readthedocs/dynamic_characterization/latest.svg?label=Read%20the%20Docs)][read the docs]
-[![Tests](https://github.com/TimoDiepers/dynamic_characterization/actions/workflows/python-test.yml/badge.svg)][tests]
-[![Codecov](https://codecov.io/gh/TimoDiepers/dynamic_characterization/branch/main/graph/badge.svg)][codecov]
-
-[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)][pre-commit]
-[![Black](https://img.shields.io/badge/code%20style-black-000000.svg)][black]
-
-[pypi status]: https://pypi.org/project/dynamic_characterization/
-[read the docs]: https://dynamic-characterization.readthedocs.io/
-[tests]: https://github.com/TimoDiepers/dynamic_characterization/actions?workflow=Tests
-[codecov]: https://app.codecov.io/gh/TimoDiepers/dynamic_characterization
-[pre-commit]: https://github.com/pre-commit/pre-commit
-[black]: https://github.com/psf/black
+[![Read the Docs](https://img.shields.io/readthedocs/timex?label=documentation)](https://dynamic-characterization.readthedocs.io/en/latest/)
+[![PyPI - Version](https://img.shields.io/pypi/v/dynamic-characterization?color=%2300549f)](https://pypi.org/project/dynamic-characterization/)
+[![Conda Version](https://img.shields.io/conda/v/diepers/dynamic_characterization?label=conda)](https://anaconda.org/diepers/dynamic_characterization)
+![Conda - License](https://img.shields.io/conda/l/diepers/bw_timex)
 
 This is a collection of dynamic characterization functions for life cycle inventories with temporal information. The functions are meant to work with a common input format of the dynamic inventory, collected in a pandas DataFrame that looks like this:
 
@@ -39,10 +25,16 @@ The functions take one row of this dynamic inventory dataframe (i.e. one emissio
 
 ## Installation
 
-You can install _dynamic_characterization_ via [pip] from [PyPI]:
+You can install `dynamic_characterization` via [pip] from [PyPI]:
 
 ```console
 $ pip install dynamic_characterization
+```
+
+Alternatively, you can also use conda:
+
+```console
+$ conda install -c diepers dynamic_characterization
 ```
 
 ## Contributing
@@ -63,28 +55,7 @@ please [file an issue][Issue Tracker] along with a detailed description.
 
 <!-- github-only -->
 
-[command-line reference]: https://dynamic_characterization.readthedocs.io/en/latest/usage.html
+[command-line reference]: https://dynamic-characterization.readthedocs.io/en/latest/usage.html
 [License]: https://github.com/TimoDiepers/dynamic_characterization/blob/main/LICENSE
 [Contributor Guide]: https://github.com/TimoDiepers/dynamic_characterization/blob/main/CONTRIBUTING.md
 [Issue Tracker]: https://github.com/TimoDiepers/dynamic_characterization/issues
-
-
-## Building the Documentation
-
-You can build the documentation locally by installing the documentation Conda environment:
-
-```bash
-conda env create -f docs/environment.yml
-```
-
-activating the environment
-
-```bash
-conda activate sphinx_dynamic_characterization
-```
-
-and [running the build command](https://www.sphinx-doc.org/en/master/man/sphinx-build.html#sphinx-build):
-
-```bash
-sphinx-build docs _build/html --builder=html --jobs=auto --write-all; open _build/html/index.html
-```
