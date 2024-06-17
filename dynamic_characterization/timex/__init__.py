@@ -4,7 +4,7 @@ Dynamic characterization functions from the bw_timex package (https://github.com
 
 __all__ = (
     "__version__",
-    "characterze_co2",
+    "characterize_co2",
     "characterize_co2_uptake",
     "characterize_co",
     "characterize_ch4",
@@ -15,9 +15,9 @@ __all__ = (
 
 __version__ = "0.0.1dev1"
 
-from . import characterize_co2
-from . import characterize_co2_uptake
-from . import characterize_co
-from . import characterize_ch4
-from . import characterize_n2o
-from . import create_generic_characterization_function
+from .radiative_forcing import characterize_co2
+from .radiative_forcing import characterize_co2_uptake
+from .radiative_forcing import characterize_co
+from .radiative_forcing import characterize_ch4
+from .radiative_forcing import characterize_n2o
+from .radiative_forcing import create_generic_characterization_function

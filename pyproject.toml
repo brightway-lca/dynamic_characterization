@@ -31,6 +31,8 @@ requires-python = ">=3.9"
 dependencies = [
     # dependencies as strings with quotes, e.g. "foo"
     # You can add version requirements like "foo>2.0"
+    "pandas",
+    "numpy",
 ]
 
 [project.urls]
@@ -60,7 +62,11 @@ dev = [
 [tool.setuptools]
 license-files = ["LICENSE"]
 include-package-data = true
-packages = ["dynamic_characterization", "temporalis", "timex"]
+packages = [
+    "dynamic_characterization", 
+    "dynamic_characterization.temporalis", 
+    "dynamic_characterization.timex",
+    ]
 
 [tool.setuptools.dynamic]
 version = {attr = "dynamic_characterization.__version__"}
