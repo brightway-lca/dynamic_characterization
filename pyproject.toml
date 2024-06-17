@@ -60,7 +60,7 @@ dev = [
 [tool.setuptools]
 license-files = ["LICENSE"]
 include-package-data = true
-packages = ["dynamic_characterization"]
+packages = ["dynamic_characterization", "temporalis", "timex"]
 
 [tool.setuptools.dynamic]
 version = {attr = "dynamic_characterization.__version__"}
