@@ -13,7 +13,7 @@ __all__ = (
     # Add functions and variables you want exposed in `dynamic_characterization.` namespace here
 )
 
-__version__ = "0.0.1dev1"
+__version__ = "0.0.1"
 
 from .radiative_forcing import characterize_co2
 from .radiative_forcing import characterize_co2_uptake
