@@ -1,7 +1,16 @@
-import pandas as pd
+from functools import cache
 import numpy as np
+import pandas as pd
 
+M_air = 28.97  # g/mol, dry air
+m_atmosphere = 5.135e18  # kg [Trenberth and Smith, 2005]
 
+# Cache dictionary to store precomputed decay multipliers
+_decay_multipliers_co2_cache = {}
+_decay_multipliers_ch4_cache = {}
+_decay_multipliers_n2o_cache = {}
+
+@cache
 def IRF_co2(year) -> callable:
     """
     Impulse Resonse Function (IRF) of CO2
@@ -27,9 +36,95 @@ def IRF_co2(year) -> callable:
         + exponentials(year, alpha_3, tau_3)
     )
 
+@cache
+def radiative_efficiency_per_kg_co2():
+    radiative_efficiency_ppb = 1.33e-5  # W/m2/ppb; 2019 background CO2 concentration; IPCC AR6 Table 7.15
+    M_co2 = 44.01  # g/mol
+    return radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere  # W/m2/kg-CO2
 
+@cache
+def radiative_efficiency_per_kg_ch4():
+    radiative_efficiency_ppb = 5.7e-4  # # W/m2/ppb; 2019 background cch4 concentration; IPCC AR6 Table 7.15. This number includes indirect effects.
+    M_ch4 = 16.04  # g/mol
+    return radiative_efficiency_ppb * M_air / M_ch4 * 1e9 / m_atmosphere # W/m2/kg-CH4
+    
+@cache
+def radiative_efficiency_per_kg_n2o():
+    radiative_efficiency_ppb = 2.8e-3  # # W/m2/ppb; 2019 background cch4 concentration; IPCC AR6 Table 7.15. This number includes indirect effects.
+    M_n2o = 44.01  # g/mol
+    return radiative_efficiency_ppb * M_air / M_n2o * 1e9 / m_atmosphere # W/m2/kg-N2O
+
+@cache
+def calculate_decay_multipliers_co2(period):
+    global _decay_multipliers_co2_cache
+
+    if period in _decay_multipliers_co2_cache:
+        return _decay_multipliers_co2_cache[period]
+
+    # Find the longest precomputed period that is shorter than the requested period
+    max_cached_period = max((p for p in _decay_multipliers_co2_cache if p < period), default=0)
+    multipliers = list(_decay_multipliers_co2_cache.get(max_cached_period, []))
+
+    radiative_efficiency_kg = radiative_efficiency_per_kg_co2()
+
+    # Compute any additional multipliers needed
+    for year in range(max_cached_period, period):
+        multipliers.append(radiative_efficiency_kg * IRF_co2(year))
+
+    # Cache the result for future use
+    _decay_multipliers_co2_cache[period] = np.array(multipliers)
+    
+    return _decay_multipliers_co2_cache[period]
+
+@cache
+def calculate_decay_multipliers_ch4(period):
+    global _decay_multipliers_ch4_cache
+    tau = 11.8  # Lifetime (years)
+
+    if period in _decay_multipliers_ch4_cache:
+        return _decay_multipliers_ch4_cache[period]
+
+    # Find the longest precomputed period that is shorter than the requested period
+    max_cached_period = max((p for p in _decay_multipliers_ch4_cache if p < period), default=0)
+    multipliers = list(_decay_multipliers_ch4_cache.get(max_cached_period, []))
+
+    radiative_efficiency_kg = radiative_efficiency_per_kg_ch4()
+
+    # Compute any additional multipliers needed
+    for year in range(max_cached_period, period):
+        multipliers.append(radiative_efficiency_kg * tau * (1 - np.exp(-year / tau)))
+
+    # Cache the result for future use
+    _decay_multipliers_ch4_cache[period] = np.array(multipliers)
+    
+    return _decay_multipliers_ch4_cache[period]
+
+@cache
+def calculate_decay_multipliers_n2o(period):
+    global _decay_multipliers_n2o_cache
+    tau = 109  # Lifetime (years)
+
+    if period in _decay_multipliers_n2o_cache:
+        return _decay_multipliers_n2o_cache[period]
+
+    # Find the longest precomputed period that is shorter than the requested period
+    max_cached_period = max((p for p in _decay_multipliers_n2o_cache if p < period), default=0)
+    multipliers = list(_decay_multipliers_n2o_cache.get(max_cached_period, []))
+
+    radiative_efficiency_kg = radiative_efficiency_per_kg_n2o()
+
+    # Compute any additional multipliers needed
+    for year in range(max_cached_period, period):
+        multipliers.append(radiative_efficiency_kg * tau * (1 - np.exp(-year / tau)))
+
+    # Cache the result for future use
+    _decay_multipliers_n2o_cache[period] = np.array(multipliers)
+    
+    return _decay_multipliers_n2o_cache[period]
+
+@cache
 def characterize_co2(
-    series,
+    row: tuple,
     period: int | None = 100,
     cumulative: bool | None = False,
 ) -> pd.DataFrame:
@@ -57,31 +152,16 @@ def characterize_co2(
     Schivley2015: Relevant scientific publication on the numerical calculation of CRF: https://doi.org/10.1021/acs.est.5b01118
     Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
     """
+    date, amount, flow, activity = row
 
-    # functional variables and units (from publications listed in docstring)
-    radiative_efficiency_ppb = (
-        1.33e-5  # W/m2/ppb; 2019 background co2 concentration; IPCC AR6 Table 7.15
-    )
-
-    # for conversion from ppb to kg-CO2
-    M_co2 = 44.01  # g/mol
-    M_air = 28.97  # g/mol, dry air
-    m_atmosphere = 5.135e18  # kg [Trenberth and Smith, 2005]
-
-    radiative_efficiency_kg = (
-        radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere
-    )  # W/m2/kg-CO2
-
-    date_beginning: np.datetime64 = series["date"].to_numpy()
+    date_beginning: np.datetime64 = date.to_numpy()
     date_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
+    
+    decay_multipliers = calculate_decay_multipliers_co2(period)
 
-    decay_multipliers: np.ndarray = np.array(
-        [radiative_efficiency_kg * IRF_co2(year) for year in range(period)]
-    )
-
-    forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
+    forcing = pd.Series(data=amount * decay_multipliers, dtype="float64")
 
     if not cumulative:
         forcing = forcing.diff(periods=1).fillna(0)
@@ -90,14 +170,14 @@ def characterize_co2(
         {
             "date": pd.Series(data=date_characterized, dtype="datetime64[s]"),
             "amount": forcing,
-            "flow": series.flow,
-            "activity": series.activity,
+            "flow": flow,
+            "activity": activity,
         }
     )
 
-
+@cache
 def characterize_co2_uptake(
-    series,
+    row,
     period: int | None = 100,
     cumulative: bool | None = False,
 ) -> pd.DataFrame:
@@ -127,31 +207,16 @@ def characterize_co2_uptake(
     Schivley2015: Relevant scientific publication on the numerical calculation of CRF: https://doi.org/10.1021/acs.est.5b01118
     Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
     """
+    date, amount, flow, activity = row
 
-    # functional variables and units (from publications listed in docstring)
-    radiative_efficiency_ppb = (
-        1.33e-5  # W/m2/ppb; 2019 background co2 concentration; IPCC AR6 Table 7.15
-    )
-
-    # for conversion from ppb to kg-CO2
-    M_co2 = 44.01  # g/mol
-    M_air = 28.97  # g/mol, dry air
-    m_atmosphere = 5.135e18  # kg [Trenberth and Smith, 2005]
-
-    radiative_efficiency_kg = (
-        radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere
-    )  # W/m2/kg-CO2
-
-    date_beginning: np.datetime64 = series["date"].to_numpy()
+    date_beginning: np.datetime64 = date.to_numpy()
     date_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
-    decay_multipliers: np.ndarray = np.array(
-        [radiative_efficiency_kg * IRF_co2(year) for year in range(period)]
-    )
+    decay_multipliers: np.ndarray = calculate_decay_multipliers_co2(period)
 
-    forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
+    forcing = pd.Series(data=amount * decay_multipliers, dtype="float64")
 
     forcing = (
         -forcing
@@ -164,14 +229,14 @@ def characterize_co2_uptake(
         {
             "date": pd.Series(data=date_characterized, dtype="datetime64[s]"),
             "amount": forcing,
-            "flow": series.flow,
-            "activity": series.activity,
+            "flow": flow,
+            "activity": activity,
         }
     )
 
-
+@cache
 def characterize_co(
-    series,
+    row,
     period: int | None = 100,
     cumulative: bool | None = False,
 ) -> pd.DataFrame:
@@ -203,35 +268,19 @@ def characterize_co(
     Schivley2015: Relevant scientific publication on the numerical calculation of CRF: https://doi.org/10.1021/acs.est.5b01118
     Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
     """
+    date, amount, flow, activity = row
 
-    # functional variables and units (from publications listed in docstring)
-    radiative_efficiency_ppb = (
-        1.33e-5  # W/m2/ppb; 2019 background co2 concentration; IPCC AR6 Table 7.15
-    )
-
-    # for conversion from ppb to kg-CO2
     M_co2 = 44.01  # g/mol
     M_co = 28.01   # g/mol
-    M_air = 28.97  # g/mol, dry air
-    m_atmosphere = 5.135e18  # kg [Trenberth and Smith, 2005]
 
-    radiative_efficiency_kg = (
-        radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere
-    )  # W/m2/kg-CO2
-
-    date_beginning: np.datetime64 = series["date"].to_numpy()
+    date_beginning: np.datetime64 = date.to_numpy()
     date_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
+    
+    decay_multipliers: np.ndarray = M_co2 / M_co * calculate_decay_multipliers_co2(period)
 
-    decay_multipliers: np.ndarray = np.array(
-        [
-            M_co2 / M_co * radiative_efficiency_kg * IRF_co2(year)
-            for year in range(period)
-        ]  # <-- Scaling from co2 to co is done here
-    )
-
-    forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
+    forcing = pd.Series(data=amount * decay_multipliers, dtype="float64")
 
     if not cumulative:
         forcing = forcing.diff(periods=1).fillna(0)
@@ -240,14 +289,14 @@ def characterize_co(
         {
             "date": pd.Series(data=date_characterized, dtype="datetime64[s]"),
             "amount": forcing,
-            "flow": series.flow,
-            "activity": series.activity,
+            "flow": flow,
+            "activity": activity,
         }
     )
 
-
+@cache
 def characterize_ch4(
-    series,
+    row,
     period: int = 100,
     cumulative=False,
 ) -> pd.DataFrame:
@@ -287,35 +336,17 @@ def characterize_ch4(
     Schivley2015: Relevant scientific publication on the numerical calculation of CRF: https://doi.org/10.1021/acs.est.5b01118
     Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
     """
+    date, amount, flow, activity = row
 
-    # functional variables and units (from publications listed in docstring)
-    radiative_efficiency_ppb = 5.7e-4  # # W/m2/ppb; 2019 background cch4 concentration; IPCC AR6 Table 7.15. This number includes indirect effects.
-
-    # for conversion from ppb to kg-CH4
-    M_ch4 = 16.04  # g/mol
-    M_air = 28.97  # g/mol, dry air
-    m_atmosphere = 5.135e18  # kg [Trenberth and Smith, 2005]
-
-    radiative_efficiency_kg = (
-        radiative_efficiency_ppb * M_air / M_ch4 * 1e9 / m_atmosphere
-    )  # W/m2/kg-CH4
-
-    tau = 11.8  # Lifetime (years)
-
-    date_beginning: np.datetime64 = series["date"].to_numpy()
+    date_beginning: np.datetime64 = date.to_numpy()
     date_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
-    decay_multipliers: list = np.array(
-        [
-            radiative_efficiency_kg * tau * (1 - np.exp(-year / tau))
-            for year in range(period)
-        ]
-    )
+    decay_multipliers = calculate_decay_multipliers_ch4(period)
 
-    forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
-
+    forcing = pd.Series(data=amount * decay_multipliers, dtype="float64")
+    
     if not cumulative:
         forcing = forcing.diff(periods=1).fillna(0)
 
@@ -323,14 +354,14 @@ def characterize_ch4(
         {
             "date": pd.Series(data=date_characterized, dtype="datetime64[s]"),
             "amount": forcing,
-            "flow": series.flow,
-            "activity": series.activity,
+            "flow": flow,
+            "activity": activity,
         }
     )
 
-
+@cache
 def characterize_n2o(
-    series,
+    row,
     period: int = 100,
     cumulative=False,
 ) -> pd.DataFrame:
@@ -367,34 +398,17 @@ def characterize_n2o(
     Schivley2015: Relevant scientific publication on the numerical calculation of CRF: https://doi.org/10.1021/acs.est.5b01118
     Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
     """
+    date, amount, flow, activity = row
 
-    # functional variables and units (from publications listed in docstring)
-    radiative_efficiency_ppb = 2.8e-3  # # W/m2/ppb; 2019 background cch4 concentration; IPCC AR6 Table 7.15. This number includes indirect effects.
-
-    # for conversion from ppb to kg-CH4
-    M_n2o = 44.01  # g/mol
-    M_air = 28.97  # g/mol, dry air
-    m_atmosphere = 5.135e18  # kg [Trenberth and Smith, 2005]
-
-    radiative_efficiency_kg = (
-        radiative_efficiency_ppb * M_air / M_n2o * 1e9 / m_atmosphere
-    )  # W/m2/kg-N2O
-
-    tau = 109  # Lifetime (years)
-
-    date_beginning: np.datetime64 = series["date"].to_numpy()
+    date_beginning: np.datetime64 = date.to_numpy()
     date_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
-    decay_multipliers: list = np.array(
-        [
-            radiative_efficiency_kg * tau * (1 - np.exp(-year / tau))
-            for year in range(period)
-        ]
-    )
+    decay_multipliers = calculate_decay_multipliers_n2o(period)
 
-    forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
+    forcing = pd.Series(data=amount * decay_multipliers, dtype="float64")
+    
     if not cumulative:
         forcing = forcing.diff(periods=1).fillna(0)
 
@@ -402,8 +416,8 @@ def characterize_n2o(
         {
             "date": pd.Series(data=date_characterized, dtype="datetime64[s]"),
             "amount": forcing,
-            "flow": series.flow,
-            "activity": series.activity,
+            "flow": flow,
+            "activity": activity,
         }
     )
 
@@ -422,9 +436,9 @@ def create_generic_characterization_function(decay_series) -> pd.DataFrame:
     A function called `characterize_generic`, which in turn returns a TimeSeries dataframe that contains the forcing of the emission of the row over the given period based on the decay series of that biosphere flow.
 
     """
-
+    @cache
     def characterize_generic(
-        series,
+        row,
         period: int = 100,
         cumulative=False,
     ) -> pd.DataFrame:
@@ -456,8 +470,9 @@ def create_generic_characterization_function(decay_series) -> pd.DataFrame:
         Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
 
         """
+        date, amount, flow, activity = row
 
-        date_beginning: np.datetime64 = series["date"].to_numpy()
+        date_beginning: np.datetime64 = date.to_numpy()
 
         dates_characterized: np.ndarray = date_beginning + np.arange(
             start=0, stop=period, dtype="timedelta64[Y]"
@@ -465,7 +480,7 @@ def create_generic_characterization_function(decay_series) -> pd.DataFrame:
 
         decay_multipliers = decay_series[:period]
 
-        forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
+        forcing = pd.Series(data=amount * decay_multipliers, dtype="float64")
 
         if not cumulative:
             forcing = forcing.diff(periods=1).fillna(0)
@@ -474,8 +489,8 @@ def create_generic_characterization_function(decay_series) -> pd.DataFrame:
             {
                 "date": pd.Series(data=dates_characterized, dtype="datetime64[s]"),
                 "amount": forcing,
-                "flow": series.flow,
-                "activity": series.activity,
+                "flow": flow,
+                "activity": activity,
             }
         )
 
