@@ -61,6 +61,10 @@ def characterize_something(series, period: int = 100, cumulative=False) -> pd.Da
     )
 ```
 
+## Support
+
+If you have any questions or need help, do not hesitate to contact Timo Diepers ([timo.diepers@ltt.rwth-aachen.de](mailto:timo.diepers@ltt.rwth-aachen.de))
+
 ```{toctree}
 ---
 hidden:
