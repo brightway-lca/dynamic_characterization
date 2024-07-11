@@ -95,6 +95,9 @@ _dynamic_characterization_ is free and open source software.
 If you encounter any problems,
 please [file an issue][Issue Tracker] along with a detailed description.
 
+## Support
+
+If you have any questions or need help, do not hesitate to contact Timo Diepers ([timo.diepers@ltt.rwth-aachen.de](mailto:timo.diepers@ltt.rwth-aachen.de))
 
 <!-- github-only -->
 
