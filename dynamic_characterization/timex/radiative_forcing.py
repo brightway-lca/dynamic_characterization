@@ -1,6 +1,14 @@
 import pandas as pd
 import numpy as np
 
+from collections import namedtuple
+from typing import namedtuple
+
+# The returns always looks the same, so we can use a named tuple for computational efficiency
+CharacterizedRow = namedtuple(
+    "CharacterizedRow", ["date", "amount", "flow", "activity"]
+)
+
 
 def IRF_co2(year) -> callable:
     """
@@ -32,7 +40,7 @@ def characterize_co2(
     series,
     period: int | None = 100,
     cumulative: bool | None = False,
-) -> pd.DataFrame:
+) -> namedtuple:
     """
     Calculate the cumulative or marginal radiative forcing (CRF) from CO2 for each year in a given period.
 
@@ -72,7 +80,7 @@ def characterize_co2(
         radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere
     )  # W/m2/kg-CO2
 
-    date_beginning: np.datetime64 = series["date"].to_numpy()
+    date_beginning: np.datetime64 = series.date.to_numpy()
     date_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
@@ -86,19 +94,19 @@ def characterize_co2(
     if not cumulative:
         forcing = np.diff(forcing, prepend=0)
 
-    return {
-        "date": np.array(date_characterized, dtype="datetime64[s]"),
-        "amount": forcing,
-        "flow": series.flow,
-        "activity": series.activity,
-    }
+    return CharacterizedRow(
+        date=np.array(date_characterized, dtype="datetime64[s]"),
+        amount=forcing,
+        flow=series.flow,
+        activity=series.activity,
+    )
 
 
 def characterize_co2_uptake(
     series,
     period: int | None = 100,
     cumulative: bool | None = False,
-) -> pd.DataFrame:
+) -> namedtuple:
     """
     The same as characterize_co2, but with a negative sign for uptake of CO2.
 
@@ -140,7 +148,7 @@ def characterize_co2_uptake(
         radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere
     )  # W/m2/kg-CO2
 
-    date_beginning: np.datetime64 = series["date"].to_numpy()
+    date_beginning: np.datetime64 = series.date.to_numpy()
     date_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
@@ -151,26 +159,25 @@ def characterize_co2_uptake(
 
     forcing = np.array(series.amount * decay_multipliers, dtype="float64")
 
-    forcing = (
-        -forcing
-    )  # flip the sign of the characterization function for CO2 uptake and not release
+    # flip the sign of the characterization function for CO2 uptake and not release
+    forcing = -forcing
 
     if not cumulative:
         forcing = np.diff(forcing, prepend=0)
 
-    return {
-        "date": np.array(date_characterized, dtype="datetime64[s]"),
-        "amount": forcing,
-        "flow": series.flow,
-        "activity": series.activity,
-    }
+    return CharacterizedRow(
+        date=np.array(date_characterized, dtype="datetime64[s]"),
+        amount=forcing,
+        flow=series.flow,
+        activity=series.activity,
+    )
 
 
 def characterize_co(
     series,
     period: int | None = 100,
     cumulative: bool | None = False,
-) -> pd.DataFrame:
+) -> namedtuple:
     """
     Calculate the cumulative or marginal radiative forcing (CRF) from CO for each year in a given period.
 
@@ -215,7 +222,7 @@ def characterize_co(
         radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere
     )  # W/m2/kg-CO2
 
-    date_beginning: np.datetime64 = series["date"].to_numpy()
+    date_beginning: np.datetime64 = series.date.to_numpy()
     date_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
@@ -232,19 +239,19 @@ def characterize_co(
     if not cumulative:
         forcing = np.diff(forcing, prepend=0)
 
-    return {
-        "date": np.array(date_characterized, dtype="datetime64[s]"),
-        "amount": forcing,
-        "flow": series.flow,
-        "activity": series.activity,
-    }
+    return CharacterizedRow(
+        date=np.array(date_characterized, dtype="datetime64[s]"),
+        amount=forcing,
+        flow=series.flow,
+        activity=series.activity,
+    )
 
 
 def characterize_ch4(
     series,
     period: int = 100,
     cumulative=False,
-) -> pd.DataFrame:
+) -> namedtuple:
     """
     Calculate the cumulative or marginal radiative forcing (CRF) from CH4 for each year in a given period.
 
@@ -296,7 +303,7 @@ def characterize_ch4(
 
     tau = 11.8  # Lifetime (years)
 
-    date_beginning: np.datetime64 = series["date"].to_numpy()
+    date_beginning: np.datetime64 = series.date.to_numpy()
     date_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
@@ -313,19 +320,19 @@ def characterize_ch4(
     if not cumulative:
         forcing = np.diff(forcing, prepend=0)
 
-    return {
-        "date": np.array(date_characterized, dtype="datetime64[s]"),
-        "amount": forcing,
-        "flow": series.flow,
-        "activity": series.activity,
-    }
+    return CharacterizedRow(
+        date=np.array(date_characterized, dtype="datetime64[s]"),
+        amount=forcing,
+        flow=series.flow,
+        activity=series.activity,
+    )
 
 
 def characterize_n2o(
     series,
     period: int = 100,
     cumulative=False,
-) -> pd.DataFrame:
+) -> namedtuple:
     """
     Calculate the cumulative or marginal radiative forcing (CRF) from N2O for each year in a given period.
 
@@ -374,7 +381,7 @@ def characterize_n2o(
 
     tau = 109  # Lifetime (years)
 
-    date_beginning: np.datetime64 = series["date"].to_numpy()
+    date_beginning: np.datetime64 = series.date.to_numpy()
     date_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
@@ -390,15 +397,15 @@ def characterize_n2o(
     if not cumulative:
         forcing = np.diff(forcing, prepend=0)
 
-    return {
-        "date": np.array(date_characterized, dtype="datetime64[s]"),
-        "amount": forcing,
-        "flow": series.flow,
-        "activity": series.activity,
-    }
+    return CharacterizedRow(
+        date=np.array(date_characterized, dtype="datetime64[s]"),
+        amount=forcing,
+        flow=series.flow,
+        activity=series.activity,
+    )
 
 
-def create_generic_characterization_function(decay_series) -> pd.DataFrame:
+def create_generic_characterization_function(decay_series) -> namedtuple:
     """
     Creates a characterization function for a GHG based on a decay series, by calling the nested method `characterize_generic()`.
 
@@ -417,7 +424,7 @@ def create_generic_characterization_function(decay_series) -> pd.DataFrame:
         series,
         period: int = 100,
         cumulative=False,
-    ) -> pd.DataFrame:
+    ) -> namedtuple:
         """
         Uses lookup generated in /dev/calculate_metrics.ipynb
         Data originates from https://doi.org/10.1029/2019RG000691
@@ -447,7 +454,7 @@ def create_generic_characterization_function(decay_series) -> pd.DataFrame:
 
         """
 
-        date_beginning: np.datetime64 = series["date"].to_numpy()
+        date_beginning: np.datetime64 = series.date.to_numpy()
 
         dates_characterized: np.ndarray = date_beginning + np.arange(
             start=0, stop=period, dtype="timedelta64[Y]"
