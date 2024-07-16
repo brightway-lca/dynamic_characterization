@@ -40,11 +40,12 @@ Here's an example of what such a function could look like:
 
 ```python
 def characterize_something(series, period: int = 100, cumulative=False) -> pd.DataFrame:
-    date_beginning: np.datetime64 = series["date"].to_numpy()
-    date_characterized: np.ndarray = date_beginning + np.arange(
+    date_beginning: np.datetime64 = series.date.to_numpy()
+    dates_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
+    # let's assume some simple decay function
     decay_multipliers: list = np.array(
         [
             1.234 * (1 - np.exp(-year / 56.789))
@@ -52,13 +53,14 @@ def characterize_something(series, period: int = 100, cumulative=False) -> pd.Da
         ]
     )
 
-    forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
+    forcing = np.array(series.amount * decay_multipliers, dtype="float64")
+
     if not cumulative:
-        forcing = forcing.diff(periods=1).fillna(0)
+        forcing = np.diff(forcing, prepend=0)
 
     return pd.DataFrame(
         {
-            "date": pd.Series(data=date_characterized, dtype="datetime64[s]"),
+            "date": np.array(dates_characterized, dtype="datetime64[s]"),
             "amount": forcing,
             "flow": series.flow,
             "activity": series.activity,
