@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 
 from collections import namedtuple
-from typing import namedtuple
 
 # The returns always looks the same, so we can use a named tuple for computational efficiency
 CharacterizedRow = namedtuple(
@@ -81,7 +80,7 @@ def characterize_co2(
     )  # W/m2/kg-CO2
 
     date_beginning: np.datetime64 = series.date.to_numpy()
-    date_characterized: np.ndarray = date_beginning + np.arange(
+    dates_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
@@ -95,7 +94,7 @@ def characterize_co2(
         forcing = np.diff(forcing, prepend=0)
 
     return CharacterizedRow(
-        date=np.array(date_characterized, dtype="datetime64[s]"),
+        date=np.array(dates_characterized, dtype="datetime64[s]"),
         amount=forcing,
         flow=series.flow,
         activity=series.activity,
@@ -149,7 +148,7 @@ def characterize_co2_uptake(
     )  # W/m2/kg-CO2
 
     date_beginning: np.datetime64 = series.date.to_numpy()
-    date_characterized: np.ndarray = date_beginning + np.arange(
+    dates_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
@@ -166,7 +165,7 @@ def characterize_co2_uptake(
         forcing = np.diff(forcing, prepend=0)
 
     return CharacterizedRow(
-        date=np.array(date_characterized, dtype="datetime64[s]"),
+        date=np.array(dates_characterized, dtype="datetime64[s]"),
         amount=forcing,
         flow=series.flow,
         activity=series.activity,
@@ -223,7 +222,7 @@ def characterize_co(
     )  # W/m2/kg-CO2
 
     date_beginning: np.datetime64 = series.date.to_numpy()
-    date_characterized: np.ndarray = date_beginning + np.arange(
+    dates_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
@@ -240,7 +239,7 @@ def characterize_co(
         forcing = np.diff(forcing, prepend=0)
 
     return CharacterizedRow(
-        date=np.array(date_characterized, dtype="datetime64[s]"),
+        date=np.array(dates_characterized, dtype="datetime64[s]"),
         amount=forcing,
         flow=series.flow,
         activity=series.activity,
@@ -304,7 +303,7 @@ def characterize_ch4(
     tau = 11.8  # Lifetime (years)
 
     date_beginning: np.datetime64 = series.date.to_numpy()
-    date_characterized: np.ndarray = date_beginning + np.arange(
+    dates_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
@@ -321,7 +320,7 @@ def characterize_ch4(
         forcing = np.diff(forcing, prepend=0)
 
     return CharacterizedRow(
-        date=np.array(date_characterized, dtype="datetime64[s]"),
+        date=np.array(dates_characterized, dtype="datetime64[s]"),
         amount=forcing,
         flow=series.flow,
         activity=series.activity,
@@ -382,7 +381,7 @@ def characterize_n2o(
     tau = 109  # Lifetime (years)
 
     date_beginning: np.datetime64 = series.date.to_numpy()
-    date_characterized: np.ndarray = date_beginning + np.arange(
+    dates_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
@@ -398,7 +397,7 @@ def characterize_n2o(
         forcing = np.diff(forcing, prepend=0)
 
     return CharacterizedRow(
-        date=np.array(date_characterized, dtype="datetime64[s]"),
+        date=np.array(dates_characterized, dtype="datetime64[s]"),
         amount=forcing,
         flow=series.flow,
         activity=series.activity,
@@ -467,11 +466,11 @@ def create_generic_characterization_function(decay_series) -> namedtuple:
         if not cumulative:
             forcing = np.diff(forcing, prepend=0)
 
-        return {
-            "date": np.array(dates_characterized, dtype="datetime64[s]"),
-            "amount": forcing,
-            "flow": series.flow,
-            "activity": series.activity,
-        }
+        return CharacterizedRow(
+            date=np.array(dates_characterized, dtype="datetime64[s]"),
+            amount=forcing,
+            flow=series.flow,
+            activity=series.activity,
+        )
 
     return characterize_generic
