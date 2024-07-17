@@ -164,8 +164,12 @@ def create_default_characterization_function_dict(
     """
 
     characterization_function_dict = dict()
+    
+    filepath = os.path.join(
+         os.path.dirname(os.path.abspath(__file__)), "timex", "data", "decay_multipliers.json"
+     )
 
-    with open("timex/data/decay_multipliers.json") as json_file:
+    with open(filepath) as json_file:
         decay_multipliers = json.load(json_file)
 
     # look up which GHGs are characterized in the selected static LCA method
