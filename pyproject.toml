@@ -33,6 +33,7 @@ dependencies = [
     # You can add version requirements like "foo>2.0"
     "pandas",
     "numpy",
+    "bw2data",
 ]
 
 [project.urls]

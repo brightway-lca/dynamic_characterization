@@ -10,7 +10,7 @@ __all__ = (
     # Add functions and variables you want exposed in `dynamic_characterization.` namespace here
 )
 
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 
 from .dynamic_characterization import characterize_dynamic_inventory
 from . import temporalis
