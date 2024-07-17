@@ -23,7 +23,7 @@ from dynamic_characterization.timex.radiative_forcing import (
 def characterize_dynamic_inventory(
     dynamic_inventory_df: pd.DataFrame,
     metric: str = "radiative_forcing",
-    characterization_function_dict: Dict[str, Callable] = {},
+    characterization_function_dict: Dict[str, Callable] = None,
     base_lcia_method: Tuple[str, ...] = None,
     time_horizon: int = 100,
     fixed_time_horizon: bool = False,
@@ -84,7 +84,9 @@ def characterize_dynamic_inventory(
             raise ValueError(
                 "Please provide an LCIA method to base the default dynamic characterization functions on."
             )
-        add_default_characterization_functions(characterization_function_dict, base_lcia_method)
+        characterization_function_dict = create_default_characterization_function_dict(
+            base_lcia_method
+        )
 
     if metric == "GWP" and not characterization_function_co2:
         characterization_function_co2 = _get_default_co2_function()
@@ -138,10 +140,9 @@ def characterize_dynamic_inventory(
 
     return characterized_inventory
 
-def add_default_characterization_functions(
-    characterization_function_dict: Dict[str, Callable],
+def create_default_characterization_function_dict(
     base_lcia_method: Tuple[str, ...]
-) -> None:
+) -> dict:
     """
     Add default dynamic characterization functions from the (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/)
     for CO2, CH4, N2O and other GHGs, based on IPCC AR6 Chapter 7 decay curves.
@@ -162,6 +163,8 @@ def add_default_characterization_functions(
 
     """
 
+    characterization_function_dict = dict()
+    
     # load pre-calculated decay multipliers for GHGs (except for CO2, CH4, N2O & CO)
     filepath = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "data", "decay_multipliers.json"
@@ -234,6 +237,7 @@ def add_default_characterization_functions(
                             np.array(decay_series)
                         )
                     )
+    return characterization_function_dict
 
 def _get_default_co2_function() -> Callable:
     """
