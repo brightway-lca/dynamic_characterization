@@ -51,7 +51,8 @@ def characterize_dynamic_inventory(
     metric : str, optional
         The metric for which the dynamic LCIA should be calculated. Default is "GWP". Available: "GWP" and "radiative_forcing". Default is "radiative_forcing".
     characterization_function_dict : dict, optional
-        A dictionary mapping biosphere flow ids to user-provided dynamic characterization functions, by default None.
+        A dictionary of the form {biosphere_flow_id: dynamic_characterization_function} allowing users to specify their own functions and what flows to apply them to.
+        Default is none, in which case a set of default functions are added based on the base_lcia_method.
     base_lcia_method : tuple, optional
         Tuple of the selcted the LCIA method, e.g. `("EF v3.1", "climate change", "global warming potential (GWP100)")`. This is
         required for adding the default characterization functions and can be kept empty if custom ones are provided.
