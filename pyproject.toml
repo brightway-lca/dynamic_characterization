@@ -19,7 +19,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -62,7 +61,9 @@ dev = [
 
 [tool.setuptools]
 license-files = ["LICENSE"]
+package-dir = { "" = "."}
 include-package-data = true
+package-data = {dynamic_characterization = ["timex/data/*.json", "timex/data/*.csv"]}
 packages = [
     "dynamic_characterization", 
     "dynamic_characterization.temporalis", 
