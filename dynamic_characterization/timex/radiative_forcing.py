@@ -1,12 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from collections import namedtuple
-
-# The returns always looks the same, so we can use a named tuple for computational efficiency
-CharacterizedRow = namedtuple(
-    "CharacterizedRow", ["date", "amount", "flow", "activity"]
-)
+from dynamic_characterization.classes import CharacterizedRow
 
 
 def IRF_co2(year) -> callable:
@@ -39,7 +34,7 @@ def characterize_co2(
     series,
     period: int | None = 100,
     cumulative: bool | None = False,
-) -> namedtuple:
+) -> CharacterizedRow:
     """
     Calculate the cumulative or marginal radiative forcing (CRF) from CO2 for each year in a given period.
 
@@ -105,7 +100,7 @@ def characterize_co2_uptake(
     series,
     period: int | None = 100,
     cumulative: bool | None = False,
-) -> namedtuple:
+) -> CharacterizedRow:
     """
     The same as characterize_co2, but with a negative sign for uptake of CO2.
 
@@ -176,7 +171,7 @@ def characterize_co(
     series,
     period: int | None = 100,
     cumulative: bool | None = False,
-) -> namedtuple:
+) -> CharacterizedRow:
     """
     Calculate the cumulative or marginal radiative forcing (CRF) from CO for each year in a given period.
 
@@ -250,7 +245,7 @@ def characterize_ch4(
     series,
     period: int = 100,
     cumulative=False,
-) -> namedtuple:
+) -> CharacterizedRow:
     """
     Calculate the cumulative or marginal radiative forcing (CRF) from CH4 for each year in a given period.
 
@@ -331,7 +326,7 @@ def characterize_n2o(
     series,
     period: int = 100,
     cumulative=False,
-) -> namedtuple:
+) -> CharacterizedRow:
     """
     Calculate the cumulative or marginal radiative forcing (CRF) from N2O for each year in a given period.
 
@@ -404,7 +399,7 @@ def characterize_n2o(
     )
 
 
-def create_generic_characterization_function(decay_series) -> namedtuple:
+def create_generic_characterization_function(decay_series) -> CharacterizedRow:
     """
     Creates a characterization function for a GHG based on a decay series, by calling the nested method `characterize_generic()`.
 
@@ -423,7 +418,7 @@ def create_generic_characterization_function(decay_series) -> namedtuple:
         series,
         period: int = 100,
         cumulative=False,
-    ) -> namedtuple:
+    ) -> CharacterizedRow:
         """
         Uses lookup generated in /dev/calculate_metrics.ipynb
         Data originates from https://doi.org/10.1029/2019RG000691
