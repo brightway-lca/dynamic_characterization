@@ -23,7 +23,7 @@ from dynamic_characterization.timex.radiative_forcing import (
 def characterize_dynamic_inventory(
     dynamic_inventory_df: pd.DataFrame,
     metric: str = "radiative_forcing",
-    characterization_function_dict: Dict[str, Callable] = None,
+    characterization_function_dict: Dict[int, Callable] = None,
     base_lcia_method: Tuple[str, ...] = None,
     time_horizon: int = 100,
     fixed_time_horizon: bool = False,
@@ -132,9 +132,9 @@ def characterize_dynamic_inventory(
     characterized_inventory = (
         pd.DataFrame(characterized_inventory_data)
         .explode(["amount", "date"])
-        .astype({"amount": "float64"})
+        .astype({"date": "datetime64[s]", "amount": "float64"})
         .query("amount != 0")[["date", "amount", "flow", "activity"]]
-        .sort_values(by="date")
+        .sort_values(by=["date", "amount"])
         .reset_index(drop=True)
     )
 
