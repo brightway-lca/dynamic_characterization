@@ -10,13 +10,14 @@ import numpy as np
 import pandas as pd
 from bw2data.utils import UnknownObject
 
+from dynamic_characterization.classes import CharacterizedRow
 from dynamic_characterization.timex.radiative_forcing import (
-            characterize_ch4,
-            characterize_co,
-            characterize_co2,
-            characterize_co2_uptake,
-            characterize_n2o,
-            create_generic_characterization_function,
+    characterize_ch4,
+    characterize_co,
+    characterize_co2,
+    characterize_co2_uptake,
+    characterize_n2o,
+    create_generic_characterization_function,
 )
 
 
@@ -34,7 +35,7 @@ def characterize_dynamic_inventory(
     Characterizes the dynamic inventory, formatted as a Dataframe, by evaluating each emission (row in DataFrame) using given dynamic characterization functions.
 
     Available metrics are radiative forcing [W/m2] and GWP [kg CO2eq], defaulting to `radiative_forcing`.
-    
+
     In case users don't provide own dynamic characterization functions, it adds dynamic characterization functions from the timex submodule
     for the GHGs mentioned in the IPCC AR6 Chapter 7, if these GHG are also characterized in the selected static LCA method.
 
@@ -140,6 +141,7 @@ def characterize_dynamic_inventory(
 
     return characterized_inventory
 
+
 def create_default_characterization_function_dict(
     base_lcia_method: Tuple[str, ...]
 ) -> dict:
@@ -164,10 +166,13 @@ def create_default_characterization_function_dict(
     """
 
     characterization_function_dict = dict()
-    
+
     filepath = os.path.join(
-         os.path.dirname(os.path.abspath(__file__)), "timex", "data", "decay_multipliers.json"
-     )
+        os.path.dirname(os.path.abspath(__file__)),
+        "timex",
+        "data",
+        "decay_multipliers.json",
+    )
 
     with open(filepath) as json_file:
         decay_multipliers = json.load(json_file)
@@ -199,9 +204,7 @@ def create_default_characterization_function_dict(
                 "The flow-identifier stored in the selected method is neither an id nor the tuple (database, code). No automatic matching possible."
             )
 
-    bioflow_nodes = set(
-        get_bioflow_node(identifier) for identifier, _ in method_data
-    )
+    bioflow_nodes = set(get_bioflow_node(identifier) for identifier, _ in method_data)
 
     for node in bioflow_nodes:
         if "carbon dioxide" in node["name"].lower():
@@ -232,11 +235,10 @@ def create_default_characterization_function_dict(
                 decay_series = decay_multipliers.get(cas_number)
                 if decay_series is not None:
                     characterization_function_dict[node.id] = (
-                        create_generic_characterization_function(
-                            np.array(decay_series)
-                        )
+                        create_generic_characterization_function(np.array(decay_series))
                     )
     return characterization_function_dict
+
 
 def _get_default_co2_function() -> Callable:
     """
@@ -263,6 +265,7 @@ def _get_default_co2_function() -> Callable:
         "Using bw_timex's default CO2 characterization function for GWP reference."
     )
     return characterize_co2
+
 
 def _calculate_dynamic_time_horizon(
     emission_date: pd.Timestamp,
@@ -302,8 +305,12 @@ def _calculate_dynamic_time_horizon(
         # conventional approach, emission is calculated from t emission for the length of time horizon
         return time_horizon
 
-def _characterize_radiative_forcing(characterization_function_dict, row, time_horizon) -> Dict:
+
+def _characterize_radiative_forcing(
+    characterization_function_dict, row, time_horizon
+) -> CharacterizedRow:
     return characterization_function_dict[row.flow](row, time_horizon)
+
 
 def _characterize_gwp(
     characterization_function_dict,
@@ -311,7 +318,7 @@ def _characterize_gwp(
     original_time_horizon,
     dynamic_time_horizon,
     characterization_function_co2,
-) -> Dict:
+) -> CharacterizedRow:
     radiative_forcing_ghg = characterization_function_dict[row.flow](
         row,
         dynamic_time_horizon,
@@ -326,9 +333,9 @@ def _characterize_gwp(
     co2_integral = radiative_forcing_co2.amount.sum()
     co2_equiv = ghg_integral / co2_integral
 
-    return {
-        "date": row.date,
-        "amount": co2_equiv,
-        "flow": row.flow,
-        "activity": row.activity,
-    }
+    return CharacterizedRow(
+        date=row.date,
+        amount=co2_equiv,
+        flow=row.flow,
+        activity=row.activity,
+    )
