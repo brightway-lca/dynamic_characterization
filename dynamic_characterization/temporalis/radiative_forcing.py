@@ -19,7 +19,7 @@ def characterize_co2(
 
     Returns
     -------
-    A TimeSeries dataframe with the following columns:
+    A CharacterizedRow object (namedtuple) with the following fields:
     - date: datetime64[s]
     - amount: float
     - flow: str
@@ -91,7 +91,7 @@ def characterize_methane(series, period: int = 100, cumulative=False) -> Charact
 
     Returns
     -------
-    A TimeSeries dataframe with the following columns:
+    A CharacterizedRow object (namedtuple) with the following fields:
     - date: datetime64[s]
     - amount: float
     - flow: str
