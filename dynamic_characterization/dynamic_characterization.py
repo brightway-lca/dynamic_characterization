@@ -197,7 +197,7 @@ def create_default_characterization_function_dict(
                 )
             return biosphere_node
 
-        if isinstance(identifier, int):  # id is an int
+        elif isinstance(identifier, int):  # id is an int
             return biosphere_db.get(id=identifier)
         else:
             raise ValueError(
