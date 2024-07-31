@@ -79,7 +79,9 @@ def characterize_dynamic_inventory(
 
     if not characterization_function_dict:
         warnings.warn(
-            "No custom dynamic characterization functions provided. Using default dynamic characterization functions from `dynamic_characterization` meant to work with biosphere3 flows. The flows that are characterized are based on the selection of the initially chosen impact category. You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_function_dict."
+            "No custom dynamic characterization functions provided. Using default dynamic characterization functions.\
+                The flows that are characterized are based on the selection of the initially chosen impact category.\
+                You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_function_dict."
         )
         if not base_lcia_method:
             raise ValueError(
