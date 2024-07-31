@@ -90,7 +90,7 @@ def characterize_dynamic_inventory(
         )
 
     if metric == "GWP" and not characterization_function_co2:
-        characterization_function_co2 = _get_default_co2_function()
+        characterization_function_co2 = characterize_co2
 
     characterized_inventory_data = []
 
@@ -146,8 +146,7 @@ def create_default_characterization_function_dict(
     base_lcia_method: Tuple[str, ...]
 ) -> dict:
     """
-    Add default dynamic characterization functions from the (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/)
-    for CO2, CH4, N2O and other GHGs, based on IPCC AR6 Chapter 7 decay curves.
+    Add default dynamic characterization functions for CO2, CH4, N2O and other GHGs, based on IPCC AR6 Chapter 7 decay curves.
 
     Please note: Currently, only CO2, CH4 and N2O include climate-carbon feedbacks.
 
@@ -239,32 +238,6 @@ def create_default_characterization_function_dict(
                     )
     return characterization_function_dict
 
-
-def _get_default_co2_function() -> Callable:
-    """
-    Get the default CO2 characterization function from the (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/).
-
-    Parameters
-    ----------
-    None
-
-    Returns
-    -------
-    Callable
-        Default CO2 characterization function
-    """
-    try:
-        from dynamic_characterization.timex.radiative_forcing import (
-            characterize_co2,
-        )
-    except ImportError:
-        raise ImportError(
-            "The default CO2 characterization function could not be loaded. Please make sure the package 'dynamic_characterization' (https://dynamic-characterization.readthedocs.io/en/latest/) is installed or provide your own function for the dynamic characterization of CO2. This is necessary for the GWP calculations."
-        )
-    warnings.warn(
-        "Using bw_timex's default CO2 characterization function for GWP reference."
-    )
-    return characterize_co2
 
 
 def _calculate_dynamic_time_horizon(
