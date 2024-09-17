@@ -64,7 +64,7 @@ def characterize_dynamic_inventory(
     time_horizon_start: pd.Timestamp, optional
         The starting timestamp of the time horizon for the dynamic characterization. Only needed for fixed time horizons. Default is datetime.now().
     characterization_function_co2: Callable, optional
-        Characterization function for CO2. This is required for the GWP calculation. If None is given, we try using timex' default CO2 function from the (separate) dynamic_characterization package (https://dynamic-characterization.readthedocs.io/en/latest/).
+        Characterization function for CO2. This is required for the GWP calculation. If None is given, we try using timex' default CO2 function.
 
     Returns
     -------
