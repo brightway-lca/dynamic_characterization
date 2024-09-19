@@ -36,9 +36,9 @@ dependencies = [
 ]
 
 [project.urls]
-source = "https://github.com/TimoDiepers/dynamic_characterization"
-homepage = "https://github.com/TimoDiepers/dynamic_characterization"
-tracker = "https://github.com/TimoDiepers/dynamic_characterization/issues"
+source = "https://github.com/brightway-lca/dynamic_characterization"
+homepage = "https://github.com/brightway-lca/dynamic_characterization"
+tracker = "https://github.com/brightway-lca/dynamic_characterization/issues"
 
 [project.optional-dependencies]
 # Getting recursive dependencies to work is a pain, this

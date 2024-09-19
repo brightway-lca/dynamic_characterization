@@ -17,7 +17,7 @@ __all__ = (
     # Add functions and variables you want exposed in `dynamic_characterization.` namespace here
 )
 
-__version__ = "0.0.1"
+__version__ = "1.0.0"
 
 from .radiative_forcing import (
     characterize_ch4,
