@@ -170,7 +170,7 @@ def create_characterization_function_dict_from_method(
 
     filepath = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "timex",
+        "ipcc_ar6",
         "data",
         "decay_multipliers.json",
     )
