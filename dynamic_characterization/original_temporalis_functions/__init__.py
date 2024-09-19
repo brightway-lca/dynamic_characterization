@@ -3,12 +3,9 @@ Dynamic characterization functions originally introduced by the bw_temporalis pa
 """
 
 __all__ = (
-    "__version__",
     "characterize_co2",
     "characterize_methane",
     # Add functions and variables you want exposed in `dynamic_characterization.` namespace here
 )
-
-__version__ = "1.0.1"
 
 from .radiative_forcing import characterize_co2, characterize_methane

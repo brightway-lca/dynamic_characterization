@@ -7,7 +7,6 @@ Forster2023: Numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.
 """
 
 __all__ = (
-    "__version__",
     "characterize_co2",
     "characterize_co2_uptake",
     "characterize_co",
@@ -16,8 +15,6 @@ __all__ = (
     "create_generic_characterization_function",
     # Add functions and variables you want exposed in `dynamic_characterization.` namespace here
 )
-
-__version__ = "1.0.1"
 
 from .radiative_forcing import (
     characterize_ch4,
