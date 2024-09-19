@@ -9,10 +9,10 @@ This is a package for the dynamic characterization of Life Cycle Inventories wit
 
 The following dynamic characterization functions are currently included:
 
-| impact category | metric | covered emissions | source
-|-------|----------|----------|--|
-| climate change | radiative forcing | CO2, CH4 |[bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main)|
-| climate change | radiative forcing | 247 GHGs from [IPCC AR6 Ch.7](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/) |[bw_timex](https://github.com/brightway-lca/bw_timex/tree/main)|
+| module |impact category | metric | covered emissions | source
+|--------|-------|----------|----------|--|
+| ipcc_ar6 | climate change | radiative forcing | 247 GHGs | radiative efficiencies & lifetimes from [IPCC AR6 Ch.7](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/) |
+| original_temporalis_functions| climate change | radiative forcing | CO2, CH4 |[bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main)|
 
 ## What do dynamic characterization functions do?
 
@@ -34,37 +34,78 @@ Each function takes one row of this dynamic inventory dataframe (i.e. one emissi
 | 313  | 20     | 4    | 2        |
 | 314  | 19     | 4    | 2        |
 
+## How do I use this package?
+
+The workflow could look like this:
+
+```python
+import pandas as pd
+from dynamic_characterization import characterize
+from dynamic_characterization.ipcc_ar6 import characterize_co2, characterize_ch4
+
+# defining a dummy dynamic inventory that you somehow got
+dynamic_inventory_df = pd.DataFrame(
+        data={
+            "date": pd.Series(
+                data=[
+                    "15-12-2020",
+                    "20-12-2020",
+                    "25-05-2022",
+                ],
+                dtype="datetime64[s]",
+            ),
+            "amount": pd.Series(data=[10.0, 20.0, 50.0], dtype="float64"),
+            "flow": pd.Series(data=[1, 1, 3], dtype="int"),
+            "activity": pd.Series(data=[2, 2, 4], dtype="int"),
+        }
+    )
+
+df_characterized = characterize(
+        dynamic_inventory_df,
+        metric="radiative_forcing", # could also be GWP
+        characterization_function_dict={
+            1: characterize_co2,
+            3: characterize_ch4,
+        },
+        time_horizon=2,
+    )
+```
+
+If you use this package with [Brightway](https://docs.brightway.dev/en/latest/), stuff can get even easier: if you have an impact assessment method at hand, you can pass it to the characterize function via the `base_lcia_method` attribute and we'll try to automatically match the flows that are characterized in that method to the flows we have characterization functions for. This matching is based on the names or the CAS numbers, depending on the flow. The function call could look like this then:
+
+```python
+df_characterized = characterize(
+        dynamic_inventory_df,
+        metric="radiative_forcing", # could also be GWP
+        base_lcia_method=('EF v3.1', 'climate change', 'global warming potential (GWP100)')
+        time_horizon=2,
+
+)
+```
+
 ## What do dynamic characterization functions look like?
 
 Here's an example of what such a function could look like:
 
 ```python
-def characterize_something(series, period: int = 100, cumulative=False) -> pd.DataFrame:
+def function_characterization_test(series: namedtuple, period: int = 2) -> namedtuple:
     date_beginning: np.datetime64 = series.date.to_numpy()
     dates_characterized: np.ndarray = date_beginning + np.arange(
-        start=0, stop=period, dtype="timedelta64[Y]"
+        start=0, stop=period, dtype="timedelta64[D]"
     ).astype("timedelta64[s]")
 
-    # let's assume some simple decay function
-    decay_multipliers: list = np.array(
-        [
-            1.234 * (1 - np.exp(-year / 56.789))
-            for year in range(period)
-        ]
+    amount_beginning: float = series.amount
+
+    # in reality, this would probably something more complex like an exponential decay function
+    amount_characterized: np.ndarray = amount_beginning - np.arange(
+        start=0, stop=period, dtype="int"
     )
 
-    forcing = np.array(series.amount * decay_multipliers, dtype="float64")
-
-    if not cumulative:
-        forcing = np.diff(forcing, prepend=0)
-
-    return pd.DataFrame(
-        {
-            "date": np.array(dates_characterized, dtype="datetime64[s]"),
-            "amount": forcing,
-            "flow": series.flow,
-            "activity": series.activity,
-        }
+    return namedtuple("CharacterizedRow", ["date", "amount", "flow", "activity"])(
+        date=np.array(dates_characterized, dtype="datetime64[s]"),
+        amount=amount_characterized,
+        flow=series.flow,
+        activity=series.activity,
     )
 ````
 
