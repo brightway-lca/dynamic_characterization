@@ -11,5 +11,4 @@ __all__ = (
 
 __version__ = "0.0.1"
 
-from .radiative_forcing import characterize_co2
-from .radiative_forcing import characterize_methane
+from .radiative_forcing import characterize_co2, characterize_methane

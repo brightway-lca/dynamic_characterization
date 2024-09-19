@@ -65,9 +65,9 @@ package-dir = { "" = "."}
 include-package-data = true
 package-data = {dynamic_characterization = ["timex/data/*.json", "timex/data/*.csv"]}
 packages = [
-    "dynamic_characterization", 
-    "dynamic_characterization.temporalis", 
-    "dynamic_characterization.timex",
+    "dynamic_characterization",
+    "dynamic_characterization.original_temporalis_functions",
+    "dynamic_characterization.ipcc_ar6",
     ]
 
 [tool.setuptools.dynamic]

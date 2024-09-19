@@ -71,7 +71,9 @@ def characterize_co2(
     )
 
 
-def characterize_methane(series, period: int = 100, cumulative=False) -> CharacterizedRow:
+def characterize_methane(
+    series, period: int = 100, cumulative=False
+) -> CharacterizedRow:
     """
     Calculate the cumulative or marginal radiative forcing (CRF) from CH4 for each year in a given period.
 

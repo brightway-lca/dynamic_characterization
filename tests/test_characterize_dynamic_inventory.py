@@ -1,6 +1,8 @@
+from collections import namedtuple
+
 import numpy as np
 import pandas as pd
-from collections import namedtuple
+
 from dynamic_characterization import characterize
 
 
@@ -37,9 +39,7 @@ def define_dataframes() -> tuple[pd.DataFrame, pd.DataFrame]:
                 ],
                 dtype="datetime64[s]",
             ),
-            "amount": pd.Series(
-                data=[10.0, 20.0, 50.0], dtype="float64"
-            ),
+            "amount": pd.Series(data=[10.0, 20.0, 50.0], dtype="float64"),
             "flow": pd.Series(data=[1, 1, 3], dtype="int"),
             "activity": pd.Series(data=[2, 2, 4], dtype="int"),
         }
@@ -101,4 +101,3 @@ def test_characterize_dynamic_inventory():
     )
 
     pd.testing.assert_frame_equal(df_characterized, df_expected_characterize)
-    

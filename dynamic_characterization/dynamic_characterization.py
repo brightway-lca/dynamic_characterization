@@ -87,8 +87,8 @@ def characterize(
             raise ValueError(
                 "Please provide an LCIA method to base the default dynamic characterization functions on."
             )
-        characterization_function_dict = create_characterization_function_dict_from_method(
-            base_lcia_method
+        characterization_function_dict = (
+            create_characterization_function_dict_from_method(base_lcia_method)
         )
 
     if metric == "GWP" and not characterization_function_co2:
@@ -239,7 +239,6 @@ def create_characterization_function_dict_from_method(
                         create_generic_characterization_function(np.array(decay_series))
                     )
     return characterization_function_dict
-
 
 
 def _calculate_dynamic_time_horizon(
