@@ -74,10 +74,12 @@ df_characterized = characterize(
 If you use this package with [Brightway](https://docs.brightway.dev/en/latest/), stuff can get even easier: if you have an impact assessment method at hand, you can pass it to the characterize function via the `base_lcia_method` attribute and we'll try to automatically match the flows that are characterized in that method to the flows we have characterization functions for. This matching is based on the names or the CAS numbers, depending on the flow. The function call could look like this then:
 
 ```python
+method = ('EF v3.1', 'climate change', 'global warming potential (GWP100)')
+
 df_characterized = characterize(
         dynamic_inventory_df,
         metric="radiative_forcing", # could also be GWP
-        base_lcia_method=('EF v3.1', 'climate change', 'global warming potential (GWP100)')
+        base_lcia_method=method,
         time_horizon=2,
 
 )
@@ -88,7 +90,7 @@ df_characterized = characterize(
 Here's an example of what such a function could look like:
 
 ```python
-def function_characterization_test(series: namedtuple, period: int = 2) -> namedtuple:
+def example_characterization_function(series: namedtuple, period: int = 2) -> namedtuple:
     date_beginning: np.datetime64 = series.date.to_numpy()
     dates_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[D]"

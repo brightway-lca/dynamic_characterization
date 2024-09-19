@@ -4,10 +4,10 @@ This is a package for the dynamic characterization of Life Cycle Inventories wit
 
 The following dynamic characterization functions are currently included:
 
-| impact category | metric | covered emissions | source
-|-------|----------|----------|--|
-| climate change | radiative forcing | CO2, CH4 |[bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main)|
-| climate change | radiative forcing | 247 GHGs from [IPCC AR6 Ch.7](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/) |[bw_timex](https://github.com/brightway-lca/bw_timex/tree/main)|
+| module |impact category | metric | covered emissions | source
+|--------|-------|----------|----------|--|
+| ipcc_ar6 | climate change | radiative forcing | 247 GHGs | radiative efficiencies & lifetimes from [IPCC AR6 Ch.7](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/) |
+| original_temporalis_functions| climate change | radiative forcing | CO2, CH4 |[bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main)|
 
 ## What do dynamic characterization functions do?
 
@@ -29,35 +29,30 @@ Each function takes one row of this dynamic inventory dataframe (i.e. one emissi
 | 313  | 20     | 4    | 2        |
 | 314  | 19     | 4    | 2        |
 
+
 ## What do dynamic characterization functions look like?
 
 Here's an example of what such a function could look like:
 
 ```python
-def characterize_something(series, period: int = 100, cumulative=False) -> pd.DataFrame:
-    date_beginning: np.datetime64 = series["date"].to_numpy()
-    date_characterized: np.ndarray = date_beginning + np.arange(
-        start=0, stop=period, dtype="timedelta64[Y]"
+def example_characterization_function(series: namedtuple, period: int = 2) -> namedtuple:
+    date_beginning: np.datetime64 = series.date.to_numpy()
+    dates_characterized: np.ndarray = date_beginning + np.arange(
+        start=0, stop=period, dtype="timedelta64[D]"
     ).astype("timedelta64[s]")
 
-    decay_multipliers: list = np.array(
-        [
-            1.234 * (1 - np.exp(-year / 56.789))
-            for year in range(period)
-        ]
+    amount_beginning: float = series.amount
+
+    # in reality, this would probably something more complex like an exponential decay function
+    amount_characterized: np.ndarray = amount_beginning - np.arange(
+        start=0, stop=period, dtype="int"
     )
 
-    forcing = pd.Series(data=series.amount * decay_multipliers, dtype="float64")
-    if not cumulative:
-        forcing = forcing.diff(periods=1).fillna(0)
-
-    return pd.DataFrame(
-        {
-            "date": pd.Series(data=date_characterized, dtype="datetime64[s]"),
-            "amount": forcing,
-            "flow": series.flow,
-            "activity": series.activity,
-        }
+    return namedtuple("CharacterizedRow", ["date", "amount", "flow", "activity"])(
+        date=np.array(dates_characterized, dtype="datetime64[s]"),
+        amount=amount_characterized,
+        flow=series.flow,
+        activity=series.activity,
     )
 ```
 
