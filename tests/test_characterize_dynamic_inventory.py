@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from collections import namedtuple
-from dynamic_characterization import characterize_dynamic_inventory
+from dynamic_characterization import characterize
 
 
 def define_dataframes() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -90,7 +90,7 @@ def function_characterization_test(series: namedtuple, period: int = 2) -> named
 
 def test_characterize_dynamic_inventory():
     df_input, df_expected_characterize = define_dataframes()
-    df_characterized = characterize_dynamic_inventory(
+    df_characterized = characterize(
         df_input,
         metric="radiative_forcing",
         characterization_function_dict={

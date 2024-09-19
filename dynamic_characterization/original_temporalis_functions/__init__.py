@@ -1,5 +1,5 @@
 """
-Dynamic characterization functions from the bw_temporalis package (https://github.com/brightway-lca/bw_temporalis).
+Dynamic characterization functions originally introduced by the bw_temporalis package (https://github.com/brightway-lca/bw_temporalis).
 """
 
 __all__ = (

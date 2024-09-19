@@ -11,7 +11,7 @@ import pandas as pd
 from bw2data.utils import UnknownObject
 
 from dynamic_characterization.classes import CharacterizedRow
-from dynamic_characterization.timex.radiative_forcing import (
+from dynamic_characterization.ipcc_ar6.radiative_forcing import (
     characterize_ch4,
     characterize_co,
     characterize_co2,
@@ -21,7 +21,7 @@ from dynamic_characterization.timex.radiative_forcing import (
 )
 
 
-def characterize_dynamic_inventory(
+def characterize(
     dynamic_inventory_df: pd.DataFrame,
     metric: str = "radiative_forcing",
     characterization_function_dict: Dict[int, Callable] = None,
@@ -87,7 +87,7 @@ def characterize_dynamic_inventory(
             raise ValueError(
                 "Please provide an LCIA method to base the default dynamic characterization functions on."
             )
-        characterization_function_dict = create_default_characterization_function_dict(
+        characterization_function_dict = create_characterization_function_dict_from_method(
             base_lcia_method
         )
 
@@ -144,7 +144,7 @@ def characterize_dynamic_inventory(
     return characterized_inventory
 
 
-def create_default_characterization_function_dict(
+def create_characterization_function_dict_from_method(
     base_lcia_method: Tuple[str, ...]
 ) -> dict:
     """
