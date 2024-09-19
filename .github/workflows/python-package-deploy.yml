@@ -7,7 +7,7 @@ on:
   release:
     types: [created]
   push:
-    branches: [main, develop]
+    branches: [main, dev]
 jobs:
   build-n-publish:
     name: Build and publish Python 🐍 distributions 📦 to PyPI and TestPyPI
@@ -15,7 +15,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@main
     - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
@@ -36,7 +36,7 @@ jobs:
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         repository-url: https://test.pypi.org/legacy/
-        skip-existing: true
+        skip_existing: true
     - name: Publish distribution 📦 to PyPI
       if: startsWith(github.ref, 'refs/tags')
       uses: pypa/gh-action-pypi-publish@release/v1
