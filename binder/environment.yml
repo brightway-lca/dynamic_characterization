@@ -1,0 +1,8 @@
+name: dynamic_characterization
+channels:
+  - conda-forge
+  - cmutel
+  - diepers
+dependencies:
+  - bw_timex>=0.2.6
+  - brightway25
