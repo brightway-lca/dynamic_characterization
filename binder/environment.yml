@@ -4,5 +4,5 @@ channels:
   - cmutel
   - diepers
 dependencies:
-  - bw_timex>=0.2.6
+  - bw_temporalis>=1.1.1
   - brightway25
