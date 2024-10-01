@@ -4,6 +4,7 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/dynamic-characterization?color=%2300549f)](https://pypi.org/project/dynamic-characterization/)
 [![Conda Version](https://img.shields.io/conda/v/diepers/dynamic_characterization?label=conda)](https://anaconda.org/diepers/dynamic_characterization)
 ![Conda - License](https://img.shields.io/conda/l/diepers/bw_timex)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/dynamic_characterization/main?labpath=notebooks%2Fdynamic_characterization_demo.ipynb)
 
 This is a package for the dynamic characterization of Life Cycle Inventories with temporal information. It includes a collection of dynamic characterization functions for various environmental flows. We also provide a simple interface to apply these functions to an existing dynamic LCI (coming from, e.g., [bw_temporalis](https://github.com/brightway-lca/bw_temporalis) or [bw_timex](https://github.com/brightway-lca/bw_timex)).
 
