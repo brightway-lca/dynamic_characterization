@@ -6,3 +6,4 @@ channels:
 dependencies:
   - bw_temporalis>=1.1.1
   - brightway25
+  - dynamic_characterization
