@@ -34,7 +34,13 @@ def characterize(
     """
     Characterizes the dynamic inventory, formatted as a Dataframe, by evaluating each emission (row in DataFrame) using given dynamic characterization functions.
 
-    Available metrics are radiative forcing [W/m2] and GWP [kg CO2eq], defaulting to `radiative_forcing`.
+    Available metrics are:
+    - radiative forcing [W/m2] 
+    - GWP [kg CO2eq], 
+    - AGTP (absolute global temperature change potential) [K]
+    - GTP (global temperature change potential) [kg CO2eq]
+
+    defaulting to `radiative_forcing`.
 
     In case users don't provide own dynamic characterization functions, it adds dynamic characterization functions from the timex submodule
     for the GHGs mentioned in the IPCC AR6 Chapter 7, if these GHG are also characterized in the selected static LCA method.
@@ -72,9 +78,9 @@ def characterize(
         characterized dynamic inventory
     """
 
-    if metric not in {"radiative_forcing", "GWP"}:
+    if metric not in {"radiative_forcing", "GWP", "AGTP", "GTP"}:
         raise ValueError(
-            f"Metric must be either 'radiative_forcing' or 'GWP', not {metric}"
+           f"Metric must be either 'radiative_forcing', 'GWP', 'AGTP' or 'GTP', not {metric}"
         )
 
     if not characterization_function_dict:
@@ -91,7 +97,7 @@ def characterize(
             create_characterization_function_dict_from_method(base_lcia_method)
         )
 
-    if metric == "GWP" and not characterization_function_co2:
+    if metric in ["GWP", "GTP"]  and not characterization_function_co2:
         characterization_function_co2 = characterize_co2
 
     characterized_inventory_data = []
