@@ -24,3 +24,6 @@ from .radiative_forcing import (
     characterize_n2o,
     create_generic_characterization_function,
 )
+
+from .agtp import ( _calculate_irf_temperature_multipliers, 
+                )

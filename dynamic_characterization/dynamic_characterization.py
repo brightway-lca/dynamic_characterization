@@ -20,6 +20,8 @@ from dynamic_characterization.ipcc_ar6.radiative_forcing import (
     create_generic_characterization_function,
 )
 
+from dynamic_characterization.ipcc_ar6.agtp import (_calculate_irf_temperature_multipliers)
+
 
 def characterize(
     dynamic_inventory_df: pd.DataFrame,
@@ -121,6 +123,13 @@ def characterize(
                     characterization_function_dict, row, dynamic_time_horizon
                 )
             )
+
+        if metric == "AGTP": # absolute global temperature change potential [K]
+            
+            characterized_inventory_data.append( #first calculate radiative forcing
+                _characterize_agtp(
+                    characterization_function_dict, row, dynamic_time_horizon
+                ))
 
         if metric == "GWP":  # scale radiative forcing to GWP [kg CO2 equivalent]
             characterized_inventory_data.append(
@@ -291,6 +300,32 @@ def _characterize_radiative_forcing(
 ) -> CharacterizedRow:
     return characterization_function_dict[row.flow](row, time_horizon)
 
+def _characterize_agtp(         
+    characterization_function_dict, 
+    row, time_horizon
+)-> CharacterizedRow:
+    """
+    Calculates the The yearly Global Temperature Potential (AGTP) for a given emission and time horizon.
+    .. math::
+        AGTP_X(H) = \\int_0^H RE_X IRF_X(t) IRF_T(H - t) \\, dt
+
+    where:
+    - :math:RE_X` is the radiative efficiency for the GHG x,
+    - :math:`IRF_X(t)` is the impulse response function of atmospheric decay the GHG at time `t`,
+    - :math:`IRF_T(H - t)` is the impulse response function of temperature at time `H - t`,
+    - :math:`H` is the time horizon.
+    - the multiplication :math:`RE_X \\cdot IRF_X(t)` is the yearly radiative forcing of the GHG x at time `t`,
+    """
+
+    row_yearly_radiative_forcing = characterization_function_dict[row.flow](row, time_horizon)
+    row_irf_temperature_multipliers = _calculate_irf_temperature_multipliers(time_horizon)
+
+   
+    row_yearly_agtp = row_yearly_radiative_forcing._replace(amount = np.multiply(row_yearly_radiative_forcing.amount, row_irf_temperature_multipliers)) #yearly AGTP
+
+    #row_agpt = row_yearly_agtp["amount"].sum() #intergral over TH -> here or later?
+
+    return row_yearly_agtp 
 
 def _characterize_gwp(
     characterization_function_dict,
