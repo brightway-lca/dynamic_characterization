@@ -131,6 +131,17 @@ def characterize(
                     characterization_function_dict, row, dynamic_time_horizon
                 ))
 
+        if metric == "GTP":  # global temperature change potential [kg CO2 equivalent]
+            characterized_inventory_data.append(
+                _characterize_gtp(
+                    characterization_function_dict=characterization_function_dict,
+                    row=row,
+                    original_time_horizon=time_horizon,
+                    dynamic_time_horizon=dynamic_time_horizon,
+                    characterization_function_co2=characterization_function_co2,
+                )
+            )
+
         if metric == "GWP":  # scale radiative forcing to GWP [kg CO2 equivalent]
             characterized_inventory_data.append(
                 _characterize_gwp(
@@ -326,6 +337,37 @@ def _characterize_agtp(
     #row_agpt = row_yearly_agtp["amount"].sum() #intergral over TH -> here or later?
 
     return row_yearly_agtp 
+    
+def _characterize_gtp(
+    characterization_function_dict,
+    row,
+    original_time_horizon,
+    dynamic_time_horizon,
+    characterization_function_co2,
+) -> CharacterizedRow:
+    
+    ghg_yearly_agtp = _characterize_agtp(         
+    characterization_function_dict, 
+    row, dynamic_time_horizon
+    )
+
+    # calculate reference agtp for 1 kg of CO2
+    characterization_function_dict_co2 = {}
+    characterization_function_dict_co2[0] = characterization_function_co2
+    co2_yearly_agtp = _characterize_agtp(characterization_function_dict_co2, 
+        row._replace(amount=1, flow=0), original_time_horizon
+    )
+
+    ghg_agtp_integral = ghg_yearly_agtp.amount.sum()
+    co2_agtp_integral = co2_yearly_agtp.amount.sum()
+    gtp_equiv = ghg_agtp_integral / co2_agtp_integral
+
+    return CharacterizedRow(
+        date=row.date,
+        amount=gtp_equiv,
+        flow=row.flow,
+        activity=row.activity,
+    )
 
 def _characterize_gwp(
     characterization_function_dict,
