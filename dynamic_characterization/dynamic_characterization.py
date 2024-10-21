@@ -311,12 +311,30 @@ def _characterize_radiative_forcing(
 ) -> CharacterizedRow:
     return characterization_function_dict[row.flow](row, time_horizon)
 
+def characterize_global_mean_temperature_change(         
+    characterization_function_dict, 
+    row, time_horizon
+)-> CharacterizedRow:
+    """
+    Calculates the change in global mean temperature due to a radiative forcing, using Olivié and Peters, eq. 4:
+    .. math::
+        T(t) = (RT *convolution* IRF_T)(t) 
+    where:
+    - :math:`IRF_T(t)` is the impulse response function of temperature at time `t`,
+    - the RT(t) yearly radiative forcing of the GHG x at time `t`,
+    """ 
+    radiative_forcing = characterization_function_dict[row.flow](row, time_horizon)
+    irf_temperature_multipliers = [ _IRF_temperature(year) for year in range(time_horizon)]
+    yearly_temp = radiative_forcing._replace(amount = np.convolve(radiative_forcing.amount, irf_temperature_multipliers)[:len(radiative_forcing.amount)]) #convolution until TH
+    
+    return yearly_temp 
+
 def _characterize_agtp(         
     characterization_function_dict, 
     row, time_horizon
 )-> CharacterizedRow:
     """
-    Calculates the The yearly Global Temperature Potential (AGTP) for a given emission and time horizon.
+    Calculates the Absolute Global Temperature Potential (AGTP) for a given emission and time horizon.
     .. math::
         AGTP_X(H) = \\int_0^H RE_X IRF_X(t) IRF_T(H - t) \\, dt
 
@@ -326,7 +344,9 @@ def _characterize_agtp(
     - :math:`IRF_T(H - t)` is the impulse response function of temperature at time `H - t`,
     - :math:`H` is the time horizon.
     - the multiplication :math:`RE_X \\cdot IRF_X(t)` is the yearly radiative forcing of the GHG x at time `t`,
-    """ 
+    """
+    # TODO check if formula is correctly translated into code
+    
     radiative_forcing = characterization_function_dict[row.flow](row, time_horizon)
     irf_temperature_multipliers = [ _IRF_temperature(year) for year in range(time_horizon)][::-1] # flipped because IRF_T(H - t)
     row_yearly_agtp = radiative_forcing._replace(amount = np.multiply(radiative_forcing.amount, irf_temperature_multipliers)) 
