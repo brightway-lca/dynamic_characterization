@@ -20,7 +20,7 @@ from dynamic_characterization.ipcc_ar6.radiative_forcing import (
     create_generic_characterization_function,
 )
 
-from dynamic_characterization.ipcc_ar6.agtp import (_IRF_temperature)
+from dynamic_characterization.ipcc_ar6.agtp import (IRF_temperature)
 
 
 def characterize(
@@ -324,7 +324,7 @@ def characterize_global_mean_temperature_change(
     - the RT(t) yearly radiative forcing of the GHG x at time `t`,
     """ 
     radiative_forcing = characterization_function_dict[row.flow](row, time_horizon)
-    irf_temperature_multipliers = [ _IRF_temperature(year) for year in range(time_horizon)]
+    irf_temperature_multipliers = [ IRF_temperature(year) for year in range(time_horizon)]
     yearly_temp = radiative_forcing._replace(amount = np.convolve(radiative_forcing.amount, irf_temperature_multipliers)[:len(radiative_forcing.amount)]) #convolution until TH
     
     return yearly_temp 
@@ -348,7 +348,7 @@ def _characterize_agtp(
     # TODO check if formula is correctly translated into code
     
     radiative_forcing = characterization_function_dict[row.flow](row, time_horizon)
-    irf_temperature_multipliers = [ _IRF_temperature(year) for year in range(time_horizon)][::-1] # flipped because IRF_T(H - t)
+    irf_temperature_multipliers = [ IRF_temperature(year) for year in range(time_horizon)][::-1] # flipped because IRF_T(H - t)
     row_yearly_agtp = radiative_forcing._replace(amount = np.multiply(radiative_forcing.amount, irf_temperature_multipliers)) 
     
     return row_yearly_agtp 

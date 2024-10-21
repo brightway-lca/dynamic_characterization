@@ -25,5 +25,4 @@ from .radiative_forcing import (
     create_generic_characterization_function,
 )
 
-from .agtp import ( _calculate_irf_temperature_multipliers, 
-                )
+from .agtp import (IRF_temperature, )
