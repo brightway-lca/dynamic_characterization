@@ -69,23 +69,18 @@ def define_dataframes() -> tuple[pd.DataFrame, pd.DataFrame]:
     return (df_input, df_expected_characterize)
 
 
-def function_characterization_test(series: namedtuple, period: int = 2) -> namedtuple:
-    date_beginning: np.datetime64 = series.date.to_numpy()
+def function_characterization_test(date, amount, flow, activity, period: int = 2) -> namedtuple:
+    date_beginning: np.datetime64 = date
     dates_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[D]"
     ).astype("timedelta64[s]")
 
-    amount_beginning: float = series.amount
+    amount_beginning: float = amount
     amount_characterized: np.ndarray = amount_beginning - np.arange(
         start=0, stop=period, dtype="int"
     )
 
-    return namedtuple("CharacterizedRow", ["date", "amount", "flow", "activity"])(
-        date=np.array(dates_characterized, dtype="datetime64[s]"),
-        amount=amount_characterized,
-        flow=series.flow,
-        activity=series.activity,
-    )
+    return dates_characterized, amount_characterized, flow, activity
 
 
 def test_characterize_dynamic_inventory():
@@ -93,7 +88,7 @@ def test_characterize_dynamic_inventory():
     df_characterized = characterize(
         df_input,
         metric="radiative_forcing",
-        characterization_function_dict={
+        characterization_functions={
             1: function_characterization_test,
             3: function_characterization_test,
         },

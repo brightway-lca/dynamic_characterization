@@ -31,7 +31,10 @@ def IRF_co2(year) -> callable:
 
 
 def characterize_co2(
-    series,
+    date,
+    amount,
+    flow,
+    activity,
     period: int | None = 100,
     cumulative: bool | None = False,
 ) -> CharacterizedRow:
@@ -74,8 +77,7 @@ def characterize_co2(
         radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere
     )  # W/m2/kg-CO2
 
-    date_beginning: np.datetime64 = series.date.to_numpy()
-    dates_characterized: np.ndarray = date_beginning + np.arange(
+    dates_characterized: np.ndarray = date + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
@@ -83,21 +85,19 @@ def characterize_co2(
         [radiative_efficiency_kg * IRF_co2(year) for year in range(period)]
     )
 
-    forcing = np.array(series.amount * decay_multipliers, dtype="float64")
+    forcing = np.array(amount * decay_multipliers, dtype="float64")
 
     if not cumulative:
         forcing = np.diff(forcing, prepend=0)
 
-    return CharacterizedRow(
-        date=np.array(dates_characterized, dtype="datetime64[s]"),
-        amount=forcing,
-        flow=series.flow,
-        activity=series.activity,
-    )
+    return dates_characterized, forcing, flow, activity
 
 
 def characterize_co2_uptake(
-    series,
+    date,
+    amount,
+    flow,
+    activity,
     period: int | None = 100,
     cumulative: bool | None = False,
 ) -> CharacterizedRow:
@@ -142,8 +142,7 @@ def characterize_co2_uptake(
         radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere
     )  # W/m2/kg-CO2
 
-    date_beginning: np.datetime64 = series.date.to_numpy()
-    dates_characterized: np.ndarray = date_beginning + np.arange(
+    dates_characterized: np.ndarray = date + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
@@ -151,7 +150,7 @@ def characterize_co2_uptake(
         [radiative_efficiency_kg * IRF_co2(year) for year in range(period)]
     )
 
-    forcing = np.array(series.amount * decay_multipliers, dtype="float64")
+    forcing = np.array(amount * decay_multipliers, dtype="float64")
 
     # flip the sign of the characterization function for CO2 uptake and not release
     forcing = -forcing
@@ -159,16 +158,14 @@ def characterize_co2_uptake(
     if not cumulative:
         forcing = np.diff(forcing, prepend=0)
 
-    return CharacterizedRow(
-        date=np.array(dates_characterized, dtype="datetime64[s]"),
-        amount=forcing,
-        flow=series.flow,
-        activity=series.activity,
-    )
+    return dates_characterized, forcing, flow, activity
 
 
 def characterize_co(
-    series,
+    date,
+    amount,
+    flow,
+    activity,
     period: int | None = 100,
     cumulative: bool | None = False,
 ) -> CharacterizedRow:
@@ -216,8 +213,7 @@ def characterize_co(
         radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere
     )  # W/m2/kg-CO2
 
-    date_beginning: np.datetime64 = series.date.to_numpy()
-    dates_characterized: np.ndarray = date_beginning + np.arange(
+    dates_characterized: np.ndarray = date + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
@@ -228,21 +224,19 @@ def characterize_co(
         ]  # <-- Scaling from co2 to co is done here
     )
 
-    forcing = np.array(series.amount * decay_multipliers, dtype="float64")
+    forcing = np.array(amount * decay_multipliers, dtype="float64")
 
     if not cumulative:
         forcing = np.diff(forcing, prepend=0)
 
-    return CharacterizedRow(
-        date=np.array(dates_characterized, dtype="datetime64[s]"),
-        amount=forcing,
-        flow=series.flow,
-        activity=series.activity,
-    )
+    return dates_characterized, forcing, flow, activity
 
 
 def characterize_ch4(
-    series,
+    date,
+    amount,
+    flow,
+    activity,
     period: int = 100,
     cumulative=False,
 ) -> CharacterizedRow:
@@ -297,8 +291,7 @@ def characterize_ch4(
 
     tau = 11.8  # Lifetime (years)
 
-    date_beginning: np.datetime64 = series.date.to_numpy()
-    dates_characterized: np.ndarray = date_beginning + np.arange(
+    dates_characterized: np.ndarray = date + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
@@ -309,21 +302,19 @@ def characterize_ch4(
         ]
     )
 
-    forcing = np.array(series.amount * decay_multipliers, dtype="float64")
+    forcing = np.array(amount * decay_multipliers, dtype="float64")
 
     if not cumulative:
         forcing = np.diff(forcing, prepend=0)
 
-    return CharacterizedRow(
-        date=np.array(dates_characterized, dtype="datetime64[s]"),
-        amount=forcing,
-        flow=series.flow,
-        activity=series.activity,
-    )
+    return dates_characterized, forcing, flow, activity
 
 
 def characterize_n2o(
-    series,
+    date,
+    amount,
+    flow,
+    activity,
     period: int = 100,
     cumulative=False,
 ) -> CharacterizedRow:
@@ -375,8 +366,7 @@ def characterize_n2o(
 
     tau = 109  # Lifetime (years)
 
-    date_beginning: np.datetime64 = series.date.to_numpy()
-    dates_characterized: np.ndarray = date_beginning + np.arange(
+    dates_characterized: np.ndarray = date + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
@@ -387,16 +377,11 @@ def characterize_n2o(
         ]
     )
 
-    forcing = np.array(series.amount * decay_multipliers, dtype="float64")
+    forcing = np.array(amount * decay_multipliers, dtype="float64")
     if not cumulative:
         forcing = np.diff(forcing, prepend=0)
 
-    return CharacterizedRow(
-        date=np.array(dates_characterized, dtype="datetime64[s]"),
-        amount=forcing,
-        flow=series.flow,
-        activity=series.activity,
-    )
+    return dates_characterized, forcing, flow, activity
 
 
 def create_generic_characterization_function(decay_series) -> CharacterizedRow:
@@ -415,7 +400,10 @@ def create_generic_characterization_function(decay_series) -> CharacterizedRow:
     """
 
     def characterize_generic(
-        series,
+        date,
+        amount,
+        flow,
+        activity,
         period: int = 100,
         cumulative=False,
     ) -> CharacterizedRow:
@@ -448,24 +436,19 @@ def create_generic_characterization_function(decay_series) -> CharacterizedRow:
 
         """
 
-        date_beginning: np.datetime64 = series.date.to_numpy()
 
-        dates_characterized: np.ndarray = date_beginning + np.arange(
+
+        dates_characterized: np.ndarray = date + np.arange(
             start=0, stop=period, dtype="timedelta64[Y]"
         ).astype("timedelta64[s]")
 
         decay_multipliers = decay_series[:period]
 
-        forcing = np.array(series.amount * decay_multipliers, dtype="float64")
+        forcing = np.array(amount * decay_multipliers, dtype="float64")
 
         if not cumulative:
             forcing = np.diff(forcing, prepend=0)
 
-        return CharacterizedRow(
-            date=np.array(dates_characterized, dtype="datetime64[s]"),
-            amount=forcing,
-            flow=series.flow,
-            activity=series.activity,
-        )
+        return dates_characterized, forcing, flow, activity
 
     return characterize_generic

@@ -27,7 +27,7 @@ dynamic_inventory_df = pd.DataFrame(
 df_characterized = characterize(
         dynamic_inventory_df,
         metric="radiative_forcing", # could also be GWP
-        characterization_function_dict={
+        characterization_functions={
             1: characterize_co2,
             3: characterize_ch4,
         },
