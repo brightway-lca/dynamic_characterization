@@ -93,7 +93,7 @@ def test_characterize_dynamic_inventory():
     df_characterized = characterize(
         df_input,
         metric="radiative_forcing",
-        characterization_function_dict={
+        characterization_functions={
             1: function_characterization_test,
             3: function_characterization_test,
         },

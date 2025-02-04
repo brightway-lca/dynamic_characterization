@@ -24,7 +24,7 @@ from dynamic_characterization.ipcc_ar6.radiative_forcing import (
 def characterize(
     dynamic_inventory_df: pd.DataFrame,
     metric: str = "radiative_forcing",
-    characterization_function_dict: Dict[int, Callable] = None,
+    characterization_functions: Dict[int, Callable] = None,
     base_lcia_method: Tuple[str, ...] = None,
     time_horizon: int = 100,
     fixed_time_horizon: bool = False,
@@ -51,11 +51,11 @@ def characterize(
         Dynamic inventory, formatted as a DataFrame, which contains the timing, id and amount of emissions and the emitting activity.
     metric : str, optional
         The metric for which the dynamic LCIA should be calculated. Default is "GWP". Available: "GWP" and "radiative_forcing". Default is "radiative_forcing".
-    characterization_function_dict : dict, optional
+    characterization_functions : dict, optional
         A dictionary of the form {biosphere_flow_id: dynamic_characterization_function} allowing users to specify their own functions and what flows to apply them to.
         Default is none, in which case a set of default functions are added based on the base_lcia_method.
     base_lcia_method : tuple, optional
-        Tuple of the selcted the LCIA method, e.g. `("EF v3.1", "climate change", "global warming potential (GWP100)")`. This is
+        Tuple of the selected the LCIA method, e.g. `("EF v3.1", "climate change", "global warming potential (GWP100)")`. This is
         required for adding the default characterization functions and can be kept empty if custom ones are provided.
     time_horizon: int, optional
         Length of the time horizon for the dynamic characterization. Default is 100 years.
@@ -77,18 +77,18 @@ def characterize(
             f"Metric must be either 'radiative_forcing' or 'GWP', not {metric}"
         )
 
-    if not characterization_function_dict:
+    if not characterization_functions:
         warnings.warn(
             "No custom dynamic characterization functions provided. Using default dynamic characterization functions.\
                 The flows that are characterized are based on the selection of the initially chosen impact category.\
-                You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_function_dict."
+                You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_functions."
         )
         if not base_lcia_method:
             raise ValueError(
                 "Please provide an LCIA method to base the default dynamic characterization functions on."
             )
-        characterization_function_dict = (
-            create_characterization_function_dict_from_method(base_lcia_method)
+        characterization_functions = (
+            create_characterization_functions_from_method(base_lcia_method)
         )
 
     if metric == "GWP" and not characterization_function_co2:
@@ -99,7 +99,7 @@ def characterize(
     for row in dynamic_inventory_df.itertuples(index=False):
 
         # skip uncharacterized biosphere flows
-        if row.flow not in characterization_function_dict.keys():
+        if row.flow not in characterization_functions.keys():
             continue
 
         dynamic_time_horizon = _calculate_dynamic_time_horizon(
@@ -112,14 +112,14 @@ def characterize(
         if metric == "radiative_forcing":  # radiative forcing in W/m2
             characterized_inventory_data.append(
                 _characterize_radiative_forcing(
-                    characterization_function_dict, row, dynamic_time_horizon
+                    characterization_functions, row, dynamic_time_horizon
                 )
             )
 
         if metric == "GWP":  # scale radiative forcing to GWP [kg CO2 equivalent]
             characterized_inventory_data.append(
                 _characterize_gwp(
-                    characterization_function_dict=characterization_function_dict,
+                    characterization_functions=characterization_functions,
                     row=row,
                     original_time_horizon=time_horizon,
                     dynamic_time_horizon=dynamic_time_horizon,
@@ -144,7 +144,7 @@ def characterize(
     return characterized_inventory
 
 
-def create_characterization_function_dict_from_method(
+def create_characterization_functions_from_method(
     base_lcia_method: Tuple[str, ...]
 ) -> dict:
     """
@@ -162,11 +162,11 @@ def create_characterization_function_dict_from_method(
 
     Returns
     -------
-    None but adds default dynamic characterization functions to the `characterization_function_dict` attribute of the DynamicCharacterization object.
+    None but adds default dynamic characterization functions to the `characterization_functions` attribute of the DynamicCharacterization object.
 
     """
 
-    characterization_function_dict = dict()
+    characterization_functions = dict()
 
     filepath = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
@@ -194,7 +194,7 @@ def create_characterization_function_dict_from_method(
                 )
             except UnknownObject as e:
                 raise UnknownObject(
-                    f"Failed to set up the default characterization functions because a biosphere node was not found. Make sure the biosphere is set up correctly or provide a characterization_function_dict. Original error: {e}"
+                    f"Failed to set up the default characterization functions because a biosphere node was not found. Make sure the biosphere is set up correctly or provide a correct mapping in 'characterization_functions'. Original error: {e}"
                 )
             return biosphere_node
 
@@ -210,35 +210,35 @@ def create_characterization_function_dict_from_method(
     for node in bioflow_nodes:
         if "carbon dioxide" in node["name"].lower():
             if "soil" in node.get("categories", []):
-                characterization_function_dict[node.id] = (
+                characterization_functions[node.id] = (
                     characterize_co2_uptake  # negative emission because uptake by soil
                 )
 
             else:
-                characterization_function_dict[node.id] = characterize_co2
+                characterization_functions[node.id] = characterize_co2
 
         elif (
             "methane, fossil" in node["name"].lower()
             or "methane, from soil or biomass stock" in node["name"].lower()
         ):
             # TODO Check why "methane, non-fossil" has a CF of 27 instead of 29.8, currently excluded
-            characterization_function_dict[node.id] = characterize_ch4
+            characterization_functions[node.id] = characterize_ch4
 
         elif "dinitrogen monoxide" in node["name"].lower():
-            characterization_function_dict[node.id] = characterize_n2o
+            characterization_functions[node.id] = characterize_n2o
 
         elif "carbon monoxide" in node["name"].lower():
-            characterization_function_dict[node.id] = characterize_co
+            characterization_functions[node.id] = characterize_co
 
         else:
             cas_number = node.get("CAS number")
             if cas_number:
                 decay_series = decay_multipliers.get(cas_number)
                 if decay_series is not None:
-                    characterization_function_dict[node.id] = (
+                    characterization_functions[node.id] = (
                         create_generic_characterization_function(np.array(decay_series))
                     )
-    return characterization_function_dict
+    return characterization_functions
 
 
 def _calculate_dynamic_time_horizon(
@@ -281,19 +281,19 @@ def _calculate_dynamic_time_horizon(
 
 
 def _characterize_radiative_forcing(
-    characterization_function_dict, row, time_horizon
+    characterization_functions, row, time_horizon
 ) -> CharacterizedRow:
-    return characterization_function_dict[row.flow](row, time_horizon)
+    return characterization_functions[row.flow](row, time_horizon)
 
 
 def _characterize_gwp(
-    characterization_function_dict,
+    characterization_functions,
     row,
     original_time_horizon,
     dynamic_time_horizon,
     characterization_function_co2,
 ) -> CharacterizedRow:
-    radiative_forcing_ghg = characterization_function_dict[row.flow](
+    radiative_forcing_ghg = characterization_functions[row.flow](
         row,
         dynamic_time_horizon,
     )
