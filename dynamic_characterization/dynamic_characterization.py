@@ -131,7 +131,9 @@ def characterize(
 
     if not characterized_inventory_data:
         raise ValueError(
-            "There are no flows to characterize. Please make sure your time horizon matches the timing of emissions and make sure there are characterization functions for the flows in the dynamic inventories."
+            "There are no flows to characterize. Please make sure your time horizon matches the \
+            timing of emissions and make sure there are characterization functions for the flows \
+            in the dynamic inventories."
         )
 
     characterized_inventory = (
@@ -201,7 +203,7 @@ def create_characterization_functions_from_method(
                     f"Failed to set up the default characterization functions because a biosphere \
                     node was not found. Make sure the biosphere is set up correctly or provide \
                     a correct mapping in 'characterization_functions'. Original error: {e}"
-                )
+                ) from e
             return biosphere_node
 
         elif isinstance(identifier, int):  # id is an int
