@@ -150,13 +150,13 @@ def create_characterization_functions_from_method(
     base_lcia_method: Tuple[str, ...]
 ) -> dict:
     """
-    Add default dynamic characterization functions for CO2, CH4, N2O and other GHGs, based on IPCC 
+    Add default dynamic characterization functions for CO2, CH4, N2O and other GHGs, based on IPCC
     AR6 Chapter 7 decay curves.
 
     Please note: Currently, only CO2, CH4 and N2O include climate-carbon feedbacks.
-    This has not yet been added for other GHGs. 
+    This has not yet been added for other GHGs.
     Refer to https://esd.copernicus.org/articles/8/235/2017/esd-8-235-2017.html for more info.
-    "Methane, non-fossil" is currently also excluded from the default characterization functions, 
+    "Methane, non-fossil" is currently also excluded from the default characterization functions,
     as it has a different static CF than fossil methane and we need to check the correct value.
 
     Parameters
@@ -256,7 +256,7 @@ def _calculate_dynamic_time_horizon(
 ) -> datetime:
     """
     Calculate the dynamic time horizon for the dynamic characterization of an emission.
-    Distinguishes between the Levasseur approach (fixed_time_horizon = True) and the conventional 
+    Distinguishes between the Levasseur approach (fixed_time_horizon = True) and the conventional
     approach (fixed_time_horizon = False).
 
     Parameters
