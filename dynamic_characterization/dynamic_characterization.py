@@ -4,6 +4,7 @@ import warnings
 from collections.abc import Collection
 from datetime import datetime
 from typing import Callable, Dict, Tuple
+from loguru import logger
 
 import bw2data as bd
 import numpy as np
@@ -78,17 +79,18 @@ def characterize(
         )
 
     if not characterization_functions:
-        warnings.warn(
-            "No custom dynamic characterization functions provided. Using default dynamic characterization functions.\
-                The flows that are characterized are based on the selection of the initially chosen impact category.\
-                You can look up the mapping in the bw_timex.dynamic_characterizer.characterization_functions."
+        logger.info(
+            "No custom dynamic characterization functions provided. Using default dynamic \
+            characterization functions. The flows that are characterized are based on the selection\
+                of the initially chosen impact category."
         )
         if not base_lcia_method:
             raise ValueError(
-                "Please provide an LCIA method to base the default dynamic characterization functions on."
+                "Please provide an LCIA method to base the default dynamic characterization \
+                functions on."
             )
-        characterization_functions = (
-            create_characterization_functions_from_method(base_lcia_method)
+        characterization_functions = create_characterization_functions_from_method(
+            base_lcia_method
         )
 
     if metric == "GWP" and not characterization_function_co2:
@@ -148,12 +150,14 @@ def create_characterization_functions_from_method(
     base_lcia_method: Tuple[str, ...]
 ) -> dict:
     """
-    Add default dynamic characterization functions for CO2, CH4, N2O and other GHGs, based on IPCC AR6 Chapter 7 decay curves.
+    Add default dynamic characterization functions for CO2, CH4, N2O and other GHGs, based on IPCC 
+    AR6 Chapter 7 decay curves.
 
     Please note: Currently, only CO2, CH4 and N2O include climate-carbon feedbacks.
-
-    This has not yet been added for other GHGs. Refer to https://esd.copernicus.org/articles/8/235/2017/esd-8-235-2017.html"
-    "Methane, non-fossil" is currently also excluded from the default characterization functions, as it has a different static CF than fossil methane and we need to check the correct value (#TODO)
+    This has not yet been added for other GHGs. 
+    Refer to https://esd.copernicus.org/articles/8/235/2017/esd-8-235-2017.html for more info.
+    "Methane, non-fossil" is currently also excluded from the default characterization functions, 
+    as it has a different static CF than fossil methane and we need to check the correct value.
 
     Parameters
     ----------
@@ -194,7 +198,9 @@ def create_characterization_functions_from_method(
                 )
             except UnknownObject as e:
                 raise UnknownObject(
-                    f"Failed to set up the default characterization functions because a biosphere node was not found. Make sure the biosphere is set up correctly or provide a correct mapping in 'characterization_functions'. Original error: {e}"
+                    f"Failed to set up the default characterization functions because a biosphere \
+                    node was not found. Make sure the biosphere is set up correctly or provide \
+                    a correct mapping in 'characterization_functions'. Original error: {e}"
                 )
             return biosphere_node
 
@@ -202,7 +208,8 @@ def create_characterization_functions_from_method(
             return biosphere_db.get(id=identifier)
         else:
             raise ValueError(
-                "The flow-identifier stored in the selected method is neither an id nor the tuple (database, code). No automatic matching possible."
+                "The flow-identifier stored in the selected method is neither an id nor the tuple \
+                (database, code). No automatic matching possible."
             )
 
     bioflow_nodes = set(get_bioflow_node(identifier) for identifier, _ in method_data)
@@ -249,7 +256,8 @@ def _calculate_dynamic_time_horizon(
 ) -> datetime:
     """
     Calculate the dynamic time horizon for the dynamic characterization of an emission.
-    Distinguishes between the Levasseur approach (fixed_time_horizon = True) and the conventional approach (fixed_time_horizon = False).
+    Distinguishes between the Levasseur approach (fixed_time_horizon = True) and the conventional 
+    approach (fixed_time_horizon = False).
 
     Parameters
     ----------
