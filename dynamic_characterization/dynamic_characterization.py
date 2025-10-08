@@ -130,11 +130,12 @@ def characterize(
             )
 
     if not characterized_inventory_data:
-        raise ValueError(
-            "There are no flows to characterize. Please make sure your time horizon matches the \
-            timing of emissions and make sure there are characterization functions for the flows \
-            in the dynamic inventories."
+        logger.warning(
+            "There are no flows to characterize. Please make sure your time horizon matches the "
+            "timing of emissions and make sure there are characterization functions for the flows "
+            "in the dynamic inventories."
         )
+        return pd.DataFrame(columns=["date", "amount", "flow", "activity"])
 
     characterized_inventory = (
         pd.DataFrame(characterized_inventory_data)
@@ -228,9 +229,9 @@ def create_characterization_functions_from_method(
 
         elif (
             "methane, fossil" in node["name"].lower()
+            or "methane, non-fossil" in node["name"].lower()
             or "methane, from soil or biomass stock" in node["name"].lower()
         ):
-            # TODO Check why "methane, non-fossil" has a CF of 27 instead of 29.8, currently excluded
             characterization_functions[node.id] = characterize_ch4
 
         elif "dinitrogen monoxide" in node["name"].lower():
