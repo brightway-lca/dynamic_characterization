@@ -247,16 +247,20 @@ def characterize_ch4(
     cumulative=False,
 ) -> CharacterizedRow:
     """
-    Calculate the cumulative or marginal radiative forcing (CRF) from CH4 for each year in a given period.
+    Calculate the cumulative or marginal radiative forcing from CH4 for each year in a given period.
 
-    Based on characterize_methane from bw_temporalis, but updated numerical values from IPCC AR6 Ch7 & SM.
+    Based on characterize_methane from bw_temporalis, but updated numerical values from IPCC AR6 
+    Ch7 & SM.
 
-    This DOES include indirect effects of CH4 on ozone and water vapor, but DOES NOT include the decay to CO2.
-    For more info on that, see the deprecated version of bw_temporalis.
+    This DOES include indirect effects of CH4 on ozone and water vapor, but DOES NOT include the 
+    decay to CO2. Therefore, this also treats fossil and biogenic methane the same. For more info, 
+    see IPCC AR6 Ch7 under "Carbon Cycle Responses and Other Indirect Contributions" on page 1014.
 
-    If `cumulative` is True, the cumulative CRF is calculated. If `cumulative` is False, the marginal CRF is calculated.
-    Takes a single row of the TimeSeries Pandas DataFrame (corresponding to a set of (`date`/`amount`/`flow`/`activity`).
-    For earch year in the given period, the CRF is calculated.
+    If `cumulative` is True, the cumulative CRF is calculated. If `cumulative` is False, the 
+    marginal CRF is calculated.
+
+    Takes a single row of the TimeSeries Pandas DataFrame (corresponding to a set of 
+    (`date`/`amount`/`flow`/`activity`). For each year in the given period, the CRF is calculated.
     Units are watts/square meter/kilogram of CH4.
 
     Parameters
