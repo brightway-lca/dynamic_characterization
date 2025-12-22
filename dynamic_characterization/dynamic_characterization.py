@@ -223,7 +223,11 @@ def create_characterization_functions_from_method(
                 characterization_functions[node.id] = (
                     characterize_co2_uptake  # negative emission because uptake by soil
                 )
-
+            elif "natural resource" and "in air" in node.get("categories", []):
+                # CO2 as a natural resource in air is assumed to be used for uptake in CDR processes
+                characterization_functions[node.id] = (
+                    characterize_co2_uptake # negative emission because uptake by CDR processes
+                )
             else:
                 characterization_functions[node.id] = characterize_co2
 
