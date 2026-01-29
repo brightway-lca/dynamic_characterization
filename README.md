@@ -13,7 +13,7 @@ The following dynamic characterization functions are currently included:
 | module |impact category | metric | covered emissions | source
 |--------|-------|----------|----------|--|
 | ipcc_ar6 | climate change | radiative forcing, GWP | 247 GHGs | radiative efficiencies & lifetimes from [IPCC AR6 Ch.7](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/) |
-| prospective | climate change | prospective_radiative_forcing, pGWP, pGTP | CO2, CH4, N2O | prospective characterization factors from [Watanabe et al. (2026)](https://pubs.acs.org/doi/10.1021/acs.est.5c12391) |
+| prospective | climate change | prospective_radiative_forcing, pGWP, pGTP | CO2, CH4, N2O | [Watanabe et al. (2026)](https://pubs.acs.org/doi/10.1021/acs.est.5c12391) |
 | original_temporalis_functions| climate change | radiative forcing | CO2, CH4 |[bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main)|
 
 ## What do dynamic characterization functions do?
