@@ -1228,8 +1228,6 @@ demo = [
     { name = "bw-temporalis" },
     { name = "bw2data" },
     { name = "bw2io" },
-]
-dev = [
     { name = "ipykernel", version = "6.31.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "ipykernel", version = "7.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
 ]
@@ -1260,8 +1258,8 @@ demo = [
     { name = "bw-temporalis", specifier = ">=1.2.0" },
     { name = "bw2data", specifier = ">=4.5.4" },
     { name = "bw2io", specifier = ">=0.9.14" },
+    { name = "ipykernel", specifier = ">=6.31.0" },
 ]
-dev = [{ name = "ipykernel", specifier = ">=6.31.0" }]
 
 [[package]]
 name = "et-xmlfile"
