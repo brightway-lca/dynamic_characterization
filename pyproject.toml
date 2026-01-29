@@ -35,6 +35,7 @@ dependencies = [
     "bw2data",
     "loguru",
     "matplotlib>=3.9.4",
+    "openpyxl>=3.1.5",
 ]
 
 [project.urls]
@@ -113,7 +114,6 @@ ensure_newline_before_comments = true
 demo = [
     "bw-temporalis>=1.2.0",
     "bw2data>=4.5.4",
-    "openpyxl>=3.1.5",
     "bw2io>=0.9.14",
     "ipykernel>=6.31.0",
 ]

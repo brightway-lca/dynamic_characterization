@@ -91,6 +91,8 @@ df_characterized = characterize(
 
 The `prospective` module provides **prospective characterization factors** based on [Barbosa Watanabe et al. (2026)](https://pubs.acs.org/doi/10.1021/acs.est.5c12391). These factors account for how radiative efficiencies change over time under different climate scenarios, making them more appropriate for future-oriented LCA studies.
 
+> For an interactive demo of pLCIA, [open the example notebook on Binder](https://mybinder.org/v2/gh/brightway-lca/dynamic_characterization/main?labpath=notebooks%2Fprospective_dynamic_lcia_demo.ipynb)
+
 ### Setting up a scenario
 
 Before using prospective metrics, you must set a background scenario:
