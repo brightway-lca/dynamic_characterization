@@ -93,6 +93,8 @@ The `prospective` module provides **prospective characterization factors** based
 
 > For an interactive demo of pLCIA, [open the example notebook on Binder](https://mybinder.org/v2/gh/brightway-lca/dynamic_characterization/main?labpath=notebooks%2Fprospective_dynamic_lcia_demo.ipynb)
 
+> NOTE: Currently, only the IAM scenarios and pathways from Barbosa Watanabe et al. (2026) are supported. This will change soon.
+
 ### Setting up a scenario
 
 Before using prospective metrics, you must set a background scenario:
