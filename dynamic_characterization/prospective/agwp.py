@@ -1,7 +1,7 @@
 """
 Absolute Global Warming Potential (AGWP) calculations.
 
-Based on Barbosa Watanabe et al. (2026) equations using prospective RE and IRF.
+Based on Watanabe et al. (2026) equations using prospective RE and IRF.
 
 AGWP = integral_0^t RE(t') * IRF(t') dt'
 

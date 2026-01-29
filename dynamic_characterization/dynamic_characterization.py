@@ -45,7 +45,7 @@ def characterize(
     Characterizes the dynamic inventory, formatted as a Dataframe, by evaluating each emission (row in DataFrame) using given dynamic characterization functions.
 
     Available metrics are radiative forcing [W/m2] and GWP [kg CO2eq], defaulting to `radiative_forcing`.
-    Additional prospective metrics pGWP, pGTP, and prospective_radiative_forcing use Barbosa Watanabe et al. (2026)
+    Additional prospective metrics pGWP, pGTP, and prospective_radiative_forcing use Watanabe et al. (2026)
     scenario-based characterization factors. For these, set the scenario first via prospective.set_scenario().
 
     In case users don't provide own dynamic characterization functions, it adds dynamic characterization functions from the timex submodule
@@ -65,9 +65,9 @@ def characterize(
         The metric for which the dynamic LCIA should be calculated. Available: "radiative_forcing", "GWP", "pGWP", "pGTP", "prospective_radiative_forcing". Default is "radiative_forcing".
         - "radiative_forcing": Returns W/m2 time series using IPCC AR6 functions
         - "GWP": Returns kg CO2eq using IPCC AR6 functions
-        - "pGWP": Returns kg CO2eq using Barbosa Watanabe et al. (2026) prospective GWP (requires scenario)
-        - "pGTP": Returns kg CO2eq using Barbosa Watanabe et al. (2026) prospective GTP (requires scenario)
-        - "prospective_radiative_forcing": Returns W/m2 time series using Barbosa Watanabe et al. (2026) functions (requires scenario)
+        - "pGWP": Returns kg CO2eq using Watanabe et al. (2026) prospective GWP (requires scenario)
+        - "pGTP": Returns kg CO2eq using Watanabe et al. (2026) prospective GTP (requires scenario)
+        - "prospective_radiative_forcing": Returns W/m2 time series using Watanabe et al. (2026) functions (requires scenario)
     characterization_functions : dict, optional
         A dictionary of the form {biosphere_flow_id: dynamic_characterization_function} allowing users to specify their own functions and what flows to apply them to.
         Default is none, in which case a set of default functions are added based on the base_lcia_method.
@@ -214,7 +214,7 @@ def create_characterization_functions_from_method(
 ) -> dict:
     """
     Add default dynamic characterization functions for CO2, CH4, N2O and other GHGs, based on IPCC
-    AR6 Chapter 7 decay curves. If use_prospective=True, uses Barbosa Watanabe et al. (2026) functions
+    AR6 Chapter 7 decay curves. If use_prospective=True, uses Watanabe et al. (2026) functions
     for CO2, CH4, and N2O (requires scenario to be set first).
 
     Please note: Currently, only CO2, CH4 and N2O include climate-carbon feedbacks.
@@ -228,7 +228,7 @@ def create_characterization_functions_from_method(
     base_lcia_method : tuple
         Tuple of the selected the LCIA method, e.g. `("EF v3.1", "climate change", "global warming potential (GWP100)")`.
     use_prospective : bool, optional
-        If True, use Barbosa Watanabe et al. (2026) prospective characterization functions for CO2, CH4, N2O.
+        If True, use Watanabe et al. (2026) prospective characterization functions for CO2, CH4, N2O.
         Default is False.
     fallback_to_ipcc : bool, optional
         Only relevant when use_prospective=True. If True (default), use IPCC AR6 characterization functions
@@ -423,7 +423,7 @@ def _characterize_pgwp(
     time_varying_re: bool = False,
 ) -> CharacterizedRow:
     """
-    Calculate prospective GWP using Barbosa Watanabe et al. (2026) characterization.
+    Calculate prospective GWP using Watanabe et al. (2026) characterization.
 
     Uses AGWP_gas / AGWP_CO2 to calculate kg CO2 equivalent.
     Emission year is extracted from the row's date.
@@ -466,7 +466,7 @@ def _characterize_pgtp(
     time_varying_re: bool = False,
 ) -> CharacterizedRow:
     """
-    Calculate prospective GTP using Barbosa Watanabe et al. (2026) characterization.
+    Calculate prospective GTP using Watanabe et al. (2026) characterization.
 
     Uses AGTP_gas / AGTP_CO2 to calculate kg CO2 equivalent.
     Emission year is extracted from the row's date.
@@ -535,7 +535,7 @@ def _characterize_prospective_radiative_forcing(
     time_varying_re: bool = False,
 ) -> CharacterizedRow:
     """
-    Calculate prospective radiative forcing using Barbosa Watanabe et al. (2026) characterization.
+    Calculate prospective radiative forcing using Watanabe et al. (2026) characterization.
 
     For GHGs available in Watanabe (CO2, CH4, N2O), uses scenario-based radiative efficiencies.
     For other GHGs (when fallback_to_ipcc=True), uses standard IPCC AR6 functions.

@@ -1,5 +1,5 @@
 """
-Prospective characterization factors based on Barbosa Watanabe et al. (2026).
+Prospective characterization factors based on Watanabe et al. (2026).
 
 Implements scenario-based characterization using time-varying radiative
 efficiencies from IAM-SSP-RCP scenarios.

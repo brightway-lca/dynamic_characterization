@@ -1,6 +1,6 @@
 # Prospective Characterization
 
-The `prospective` module provides **prospective characterization factors (pCFs)** based on [Barbosa Watanabe et al. (2026)](https://pubs.acs.org/doi/10.1021/acs.est.5c12391). Unlike conventional characterization factors that use fixed radiative efficiencies, prospective CFs account for how atmospheric conditions change over time under different climate scenarios.
+The `prospective` module provides **prospective characterization factors (pCFs)** based on [Watanabe et al. (2026)](https://pubs.acs.org/doi/10.1021/acs.est.5c12391). Unlike conventional characterization factors that use fixed radiative efficiencies, prospective CFs account for how atmospheric conditions change over time under different climate scenarios.
 
 ## Why Use Prospective Characterization?
 

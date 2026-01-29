@@ -2,7 +2,7 @@
 Watanabe prospective characterization functions.
 
 Returns radiative forcing time series matching the existing ipcc_ar6 API,
-but using scenario-based radiative efficiencies from Barbosa Watanabe et al. (2026).
+but using scenario-based radiative efficiencies from Watanabe et al. (2026).
 
 Reference: https://doi.org/10.1021/acs.est.5b01118
 """
@@ -81,7 +81,7 @@ def characterize_co2(
     """
     Calculate radiative forcing time series for 1 kg CO2 emission.
 
-    Uses scenario-based radiative efficiencies from Barbosa Watanabe et al. (2026).
+    Uses scenario-based radiative efficiencies from Watanabe et al. (2026).
     Scenario must be set via prospective.set_scenario() before calling.
 
     Parameters
@@ -193,7 +193,7 @@ def characterize_ch4(
     """
     Calculate radiative forcing time series for 1 kg CH4 emission.
 
-    Uses scenario-based radiative efficiencies from Barbosa Watanabe et al. (2026).
+    Uses scenario-based radiative efficiencies from Watanabe et al. (2026).
     Scenario must be set via prospective.set_scenario() before calling.
 
     This includes only direct effects. For indirect effects (ozone, water vapor),
@@ -282,7 +282,7 @@ def characterize_n2o(
     """
     Calculate radiative forcing time series for 1 kg N2O emission.
 
-    Uses scenario-based radiative efficiencies from Barbosa Watanabe et al. (2026).
+    Uses scenario-based radiative efficiencies from Watanabe et al. (2026).
     Scenario must be set via prospective.set_scenario() before calling.
 
     Parameters

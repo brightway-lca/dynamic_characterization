@@ -50,7 +50,7 @@ def set_scenario(iam: str, ssp: str, rcp: str) -> None:
     Raises
     ------
     ValueError
-        If the combination is not valid per Barbosa Watanabe et al. (2026).
+        If the combination is not valid per Watanabe et al. (2026).
     """
     global _current_scenario
 

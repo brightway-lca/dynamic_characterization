@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fixed packaging issue
 
 ## [1.3.0] - (2026-01-29)
-* Add new prospective module for prospective-dynamic LCIA based on Barbosa Watanabe et al. (2026)
+* Add new prospective module for prospective-dynamic LCIA based on Watanabe et al. (2026)
 
 ## [1.2.0] - (2025-10-08)
 * Instead of not characterizing non-fossil methane, treat it the same as fossil methane. Discussion at https://github.com/brightway-lca/dynamic_characterization/issues/15.

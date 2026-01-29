@@ -1,7 +1,7 @@
 """
 Absolute Global Temperature Potential (AGTP) calculations.
 
-Based on Barbosa Watanabe et al. (2026) using two-layer energy balance model.
+Based on Watanabe et al. (2026) using two-layer energy balance model.
 
 AGTP = integral_0^t RF(t') * R(t-t') dt'
 

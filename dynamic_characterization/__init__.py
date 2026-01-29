@@ -3,7 +3,7 @@ Collection of dynamic characterization functions for life cycle inventories with
 
 Provides:
 - ipcc_ar6: IPCC AR6-based characterization functions for CO2, CH4, N2O, etc.
-- prospective: Prospective characterization factors from Barbosa Watanabe et al. (2026)
+- prospective: Prospective characterization factors from Watanabe et al. (2026)
 - original_temporalis_functions: Legacy functions from bw_temporalis
 
 For prospective metrics (pGWP, pGTP), set the scenario first:

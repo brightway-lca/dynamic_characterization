@@ -13,7 +13,7 @@ The following dynamic characterization functions are currently included:
 | module |impact category | metric | covered emissions | source
 |--------|-------|----------|----------|--|
 | ipcc_ar6 | climate change | radiative forcing, GWP | 247 GHGs | radiative efficiencies & lifetimes from [IPCC AR6 Ch.7](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/) |
-| prospective | climate change | prospective_radiative_forcing, pGWP, pGTP | CO2, CH4, N2O | prospective characterization factors from [Barbosa Watanabe et al. (2026)](https://pubs.acs.org/doi/10.1021/acs.est.5c12391) |
+| prospective | climate change | prospective_radiative_forcing, pGWP, pGTP | CO2, CH4, N2O | prospective characterization factors from [Watanabe et al. (2026)](https://pubs.acs.org/doi/10.1021/acs.est.5c12391) |
 | original_temporalis_functions| climate change | radiative forcing | CO2, CH4 |[bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main)|
 
 ## What do dynamic characterization functions do?
@@ -89,11 +89,11 @@ df_characterized = characterize(
 
 ## Prospective Characterization
 
-The `prospective` module provides **prospective characterization factors** based on [Barbosa Watanabe et al. (2026)](https://pubs.acs.org/doi/10.1021/acs.est.5c12391). These factors account for how radiative efficiencies change over time under different climate scenarios, making them more appropriate for future-oriented LCA studies.
+The `prospective` module provides **prospective characterization factors** based on [Watanabe et al. (2026)](https://pubs.acs.org/doi/10.1021/acs.est.5c12391). These factors account for how radiative efficiencies change over time under different climate scenarios, making them more appropriate for future-oriented LCA studies.
 
 > For an interactive demo of pLCIA, [open the example notebook on Binder](https://mybinder.org/v2/gh/brightway-lca/dynamic_characterization/main?labpath=notebooks%2Fprospective_dynamic_lcia_demo.ipynb)
 
-> NOTE: Currently, only the IAM scenarios and pathways from Barbosa Watanabe et al. (2026) are supported. This will change soon.
+> NOTE: Currently, only the IAM scenarios and pathways from Watanabe et al. (2026) are supported. This will change soon.
 
 ### Setting up a scenario
 
