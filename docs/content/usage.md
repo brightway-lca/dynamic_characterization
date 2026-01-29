@@ -47,3 +47,17 @@ df_characterized = characterize(
         time_horizon=2,
 )
 ```
+
+## Available Metrics
+
+The `characterize()` function supports the following metrics:
+
+| Metric | Description | Module |
+|--------|-------------|--------|
+| `radiative_forcing` | Radiative forcing time series (W/m²) | ipcc_ar6 |
+| `GWP` | Global Warming Potential (kg CO2eq) | ipcc_ar6 |
+| `prospective_radiative_forcing` | Prospective radiative forcing time series (W/m²) | prospective |
+| `pGWP` | Prospective GWP with scenario-based RE (kg CO2eq) | prospective |
+| `pGTP` | Prospective GTP with scenario-based RE (kg CO2eq) | prospective |
+
+For the prospective metrics (`pGWP`, `pGTP`), you need to set a background scenario first. See [Prospective Characterization](prospective.md) for details.

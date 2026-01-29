@@ -12,7 +12,8 @@ The following dynamic characterization functions are currently included:
 
 | module |impact category | metric | covered emissions | source
 |--------|-------|----------|----------|--|
-| ipcc_ar6 | climate change | radiative forcing | 247 GHGs | radiative efficiencies & lifetimes from [IPCC AR6 Ch.7](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/) |
+| ipcc_ar6 | climate change | radiative forcing, GWP | 247 GHGs | radiative efficiencies & lifetimes from [IPCC AR6 Ch.7](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/) |
+| prospective | climate change | prospective_radiative_forcing, pGWP, pGTP | CO2, CH4, N2O | prospective characterization factors from [Barbosa Watanabe et al. (2026)](https://pubs.acs.org/doi/10.1021/acs.est.5c12391) |
 | original_temporalis_functions| climate change | radiative forcing | CO2, CH4 |[bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main)|
 
 ## What do dynamic characterization functions do?
@@ -83,6 +84,91 @@ df_characterized = characterize(
         base_lcia_method=method,
         time_horizon=2,
 
+)
+```
+
+## Prospective Characterization
+
+The `prospective` module provides **prospective characterization factors** based on [Barbosa Watanabe et al. (2026)](https://pubs.acs.org/doi/10.1021/acs.est.5c12391). These factors account for how radiative efficiencies change over time under different climate scenarios, making them more appropriate for future-oriented LCA studies.
+
+### Setting up a scenario
+
+Before using prospective metrics, you must set a background scenario:
+
+```python
+import dynamic_characterization.prospective as prospective
+
+# Set the scenario (required before using pGWP or pGTP)
+prospective.set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
+```
+
+Available scenario combinations:
+- **IAMs**: IMAGE, AIM, GCAM4, MESSAGE, REMIND
+- **SSPs**: SSP1-SSP5 (availability depends on IAM)
+- **RCPs**: 2.6, 4.5, 6.0, 8.5
+
+### Using prospective metrics
+
+```python
+from dynamic_characterization import characterize
+
+# Using prospective radiative forcing (W/m² time series)
+df_prf = characterize(
+    dynamic_inventory_df,
+    metric="prospective_radiative_forcing",
+    base_lcia_method=method,
+    time_horizon=100,
+)
+
+# Using prospective GWP (kg CO2eq)
+df_pgwp = characterize(
+    dynamic_inventory_df,
+    metric="pGWP",
+    base_lcia_method=method,
+    time_horizon=100,
+)
+
+# Using prospective GTP (kg CO2eq)
+df_pgtp = characterize(
+    dynamic_inventory_df,
+    metric="pGTP",
+    base_lcia_method=method,
+    time_horizon=100,
+)
+```
+
+### Fallback to IPCC for unsupported GHGs
+
+The Watanabe module only provides prospective characterization for CO2, CH4, and N2O. By default, other GHGs (like CO and the 244 other GHGs from IPCC AR6) fall back to standard IPCC characterization:
+
+```python
+# Default: use IPCC for GHGs not in Watanabe (fallback_to_ipcc=True)
+df_prf = characterize(
+    dynamic_inventory_df,
+    metric="prospective_radiative_forcing",
+    base_lcia_method=method,
+    fallback_to_ipcc=True,  # default
+)
+
+# Strict mode: only characterize CO2, CH4, N2O
+df_prf_strict = characterize(
+    dynamic_inventory_df,
+    metric="prospective_radiative_forcing",
+    base_lcia_method=method,
+    fallback_to_ipcc=False,  # skip GHGs not in Watanabe
+)
+```
+
+### Time-varying radiative efficiency
+
+By default, the radiative efficiency (RE) is fixed at the emission year (IPCC standard approach). You can enable time-varying RE for more physical accuracy:
+
+```python
+df_pgwp = characterize(
+    dynamic_inventory_df,
+    metric="pGWP",
+    base_lcia_method=method,
+    time_varying_re=True,  # RE evolves as gas decays
 )
 ```
 
