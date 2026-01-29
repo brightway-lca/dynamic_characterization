@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - (2026-01-29)
+* Fixed packaging issue
+
 ## [1.3.0] - (2026-01-29)
 * Add new prospective module for prospective-dynamic LCIA based on Barbosa Watanabe et al. (2026)
 
