@@ -20,7 +20,7 @@ __all__ = (
     "prospective",
 )
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 from . import ipcc_ar6, original_temporalis_functions, prospective
 from .dynamic_characterization import (
