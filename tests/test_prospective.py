@@ -6,6 +6,7 @@ import importlib.util
 import os
 import sys
 import types
+import pandas as pd
 
 # Set up fake parent package structure to enable relative imports in prospective modules
 _prospective_dir = os.path.join(
@@ -204,31 +205,15 @@ def test_agwp_n2o_basic():
 
 
 # --- pGWP100 Validation Tests Against SI Reference Tables ---
-#
+
 # IMPORTANT NOTE ON INDIRECT EFFECTS:
 # The Watanabe SI tables (es5c12391_si_003.xlsx for CH4, es5c12391_si_004.xlsx for N2O)
 # report pGWP100 values that INCLUDE indirect effects for CH4:
 # - Tropospheric ozone formation from CH4 oxidation
 # - Stratospheric water vapor from CH4 oxidation
-#
-# Per IPCC AR6 Chapter 7 Table 7.15:
-# - Direct CH4 GWP100: ~19.3
-# - Including indirect effects: ~27.9 (factor of ~1.45)
-#
-# Our AGWP implementation calculates DIRECT radiative forcing only.
-# Therefore, our pGWP100 = AGWP_CH4 / AGWP_CO2 will be ~30% lower than SI table values.
-#
-# The indirect effects factor can be estimated by comparing:
-# SI_pGWP100 / calculated_direct_pGWP100 ~ 1.4-1.5
-#
-# For N2O, indirect effects are minimal, so the match should be closer.
-
-import pandas as pd
-
-# Indirect effects multiplier for CH4 (based on IPCC AR6)
-# The factor varies slightly by scenario/year, but ~1.43 is typical
-CH4_INDIRECT_EFFECTS_FACTOR = 1.43
-
+# Our AGWP implementation of CH4 can calculate both DIRECT and INDIRECT radiative forcing.
+# Our AGWP implementation of NO2 calculates DIRECT radiative forcing only.
+# For N2O, indirect effects are minimal, so the match should be close.
 
 def _find_si_row(df: pd.DataFrame, iam: str, ssp: str, rcp: str) -> pd.Series:
     """
@@ -250,7 +235,6 @@ def _find_si_row(df: pd.DataFrame, iam: str, ssp: str, rcp: str) -> pd.Series:
     pd.Series
         Matching row, or empty Series if not found
     """
-    # Match based on components in the scenario string
     mask = (
         df["Scenario"].str.contains(iam, case=False, na=False)
         & df["Scenario"].str.contains(ssp, case=False, na=False)
@@ -272,106 +256,93 @@ _DATA_DIR = os.path.join(
 )
 
 
-def test_pgwp100_ch4_direct_image_ssp1_26():
-    """
-    Direct pGWP100 for CH4 (without indirect effects) for IMAGE-SSP1-2.6.
 
-    Our AGWP implementation calculates direct radiative forcing only.
-    The SI table values INCLUDE indirect effects (~1.43x multiplier).
 
-    This test verifies:
-    1. Direct pGWP is reasonable (between IPCC direct value ~19-22)
-    2. When adjusted for indirect effects, matches SI table within 10%
-    """
+def _reference_agwp_co2(emission_year: int, time_horizon: int = 100) -> float:
+    """Reference CO2 AGWP using the trapezoidal integration from Watanabe SI Code #3."""
+    scenario = config.get_scenario()
+    iam, ssp, rcp = scenario["iam"], scenario["ssp"], scenario["rcp"]
+
+    re_data = data_loader.load_re_co2(iam)
+    years = re_data["_years"]
+    year_idx = np.searchsorted(years, emission_year)
+    re_value = re_data[ssp][rcp][year_idx]
+
+    # Watanabe's SI code selects the CO2 IRF column by scenario position, not by RCP label.
+    # Reproducing the SI tables requires mirroring that behavior in the test reference.
+    scenario_index = list(re_data[ssp].keys()).index(rcp)
+    irf_df = pd.read_excel(os.path.join(_DATA_DIR, "es5c12391_si_010.xlsx"))
+    irf_values = irf_df.iloc[:time_horizon, 1 + scenario_index].to_numpy()
+
+    rf_values = re_value * irf_values * agwp.CONST_CO2
+    agwp_values = [(rf_values[0] + rf_values[1]) / 2]
+    for t in range(1, len(rf_values) - 1):
+        agwp_values.append(agwp_values[-1] + (rf_values[t] + rf_values[t + 1]) / 2)
+    agwp_values.append(agwp_values[-1] + rf_values[-1])
+    return float(agwp_values[-1])
+
+def _assert_pgwp100_ch4_matches_si(iam: str, ssp: str, rcp: str, year: int):
+    """Reusable helper to check pGWP values."""
     ref_df = pd.read_excel(os.path.join(_DATA_DIR, "es5c12391_si_003.xlsx"))
+    row = _find_si_row(ref_df, iam, ssp, rcp)
+    assert not row.empty, f"{iam}-{ssp}-{rcp} scenario not found in SI table"
 
+    config.set_scenario(iam=iam, ssp=ssp, rcp=rcp)
+
+    calculated_pgwp = agwp.agwp_ch4(
+        emission_year=year, time_horizon=100, indirect_effects="all"
+    ) / _reference_agwp_co2(emission_year=year, time_horizon=100)
+
+    assert calculated_pgwp == pytest.approx(row[year], abs=0.2)
+
+
+def test_agwp_ch4_indirect_effects_are_monotonic():
+    """The three CH4 modes should monotonically add warming contributions."""
     config.set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
 
-    # Test year 2030
-    agwp_ch4_val = agwp.agwp_ch4(emission_year=2030, time_horizon=100)
-    agwp_co2_val = agwp.agwp_co2(emission_year=2030, time_horizon=100)
-    calculated_direct_pgwp = agwp_ch4_val / agwp_co2_val
-
-    row = _find_si_row(ref_df, "IMAGE", "SSP1", "2.6")
-    assert not row.empty, "IMAGE-SSP1-2.6 scenario not found in SI table"
-
-    si_value = row[2030]
-
-    # Verify direct pGWP is in expected range (~19-22)
-    assert 18 < calculated_direct_pgwp < 25, (
-        f"Direct pGWP100 CH4 outside expected range: {calculated_direct_pgwp:.1f}"
+    direct = agwp.agwp_ch4(emission_year=2030, time_horizon=100, indirect_effects="none")
+    no_carbon_cycle = agwp.agwp_ch4(
+        emission_year=2030, time_horizon=100, indirect_effects="no_carbon_cycle"
     )
+    all_indirect = agwp.agwp_ch4(emission_year=2030, time_horizon=100, indirect_effects="all")
 
-    # Verify that applying indirect effects factor brings us close to SI value
-    adjusted_pgwp = calculated_direct_pgwp * CH4_INDIRECT_EFFECTS_FACTOR
-    assert adjusted_pgwp == pytest.approx(si_value, rel=0.10), (
-        f"pGWP100 CH4 with indirect adjustment mismatch for IMAGE-SSP1-2.6 at 2030: "
-        f"got {adjusted_pgwp:.1f} (direct: {calculated_direct_pgwp:.1f} x {CH4_INDIRECT_EFFECTS_FACTOR}), "
-        f"expected {si_value:.1f}"
-    )
+    assert direct < no_carbon_cycle < all_indirect
 
 
-def test_pgwp100_ch4_direct_aim_ssp3_60():
-    """
-    Direct pGWP100 for CH4 (without indirect effects) for AIM-SSP3-6.0.
-    """
-    ref_df = pd.read_excel(os.path.join(_DATA_DIR, "es5c12391_si_003.xlsx"))
-
-    config.set_scenario(iam="AIM", ssp="SSP3", rcp="6.0")
-
-    agwp_ch4_val = agwp.agwp_ch4(emission_year=2030, time_horizon=100)
-    agwp_co2_val = agwp.agwp_co2(emission_year=2030, time_horizon=100)
-    calculated_direct_pgwp = agwp_ch4_val / agwp_co2_val
-
-    row = _find_si_row(ref_df, "AIM", "SSP3", "6.0")
-    assert not row.empty, "AIM-SSP3-6.0 scenario not found in SI table"
-
-    si_value = row[2030]
-
-    # Verify direct pGWP is in expected range
-    assert 18 < calculated_direct_pgwp < 25
-
-    # Verify that applying indirect effects factor brings us close to SI value
-    adjusted_pgwp = calculated_direct_pgwp * CH4_INDIRECT_EFFECTS_FACTOR
-    assert adjusted_pgwp == pytest.approx(si_value, rel=0.10), (
-        f"pGWP100 CH4 with indirect adjustment mismatch for AIM-SSP3-6.0 at 2030: "
-        f"got {adjusted_pgwp:.1f}, expected {si_value:.1f}"
-    )
+def test_pgwp100_ch4_image_ssp1_26_matches_si():
+    """CH4 pGWP100 should match Watanabe Table S.2 for IMAGE-SSP1-2.6."""
+    _assert_pgwp100_ch4_matches_si("IMAGE", "SSP1", "2.6", 2030)
 
 
-def test_pgwp100_ch4_direct_multiple_years():
-    """
-    Direct pGWP100 for CH4 across multiple years (2030, 2040, 2050).
+def test_pgwp100_ch4_aim_ssp3_60_matches_si():
+    """CH4 pGWP100 should match Watanabe Table S.2 for AIM-SSP3-6.0."""
+    _assert_pgwp100_ch4_matches_si("AIM", "SSP3", "6.0", 2030)
 
-    Tests that our direct AGWP calculation is consistent across years.
-    Note: The indirect effects factor may vary slightly by year.
-    """
-    ref_df = pd.read_excel(os.path.join(_DATA_DIR, "es5c12391_si_003.xlsx"))
 
-    config.set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
-
-    row = _find_si_row(ref_df, "IMAGE", "SSP1", "2.6")
-    assert not row.empty
-
+def test_pgwp100_ch4_multiple_years_match_si():
+    """CH4 pGWP100 should match Watanabe Table S.2 across pulse years."""
     for year in [2030, 2040, 2050]:
-        agwp_ch4_val = agwp.agwp_ch4(emission_year=year, time_horizon=100)
-        agwp_co2_val = agwp.agwp_co2(emission_year=year, time_horizon=100)
-        calculated_direct_pgwp = agwp_ch4_val / agwp_co2_val
+        _assert_pgwp100_ch4_matches_si("IMAGE", "SSP1", "2.6", year)
 
-        si_value = row[year]
 
-        # Direct pGWP should be in expected range
-        assert 18 < calculated_direct_pgwp < 28, (
-            f"Direct pGWP100 CH4 at {year} outside expected range: {calculated_direct_pgwp:.1f}"
-        )
-
-        # With indirect effects adjustment, should be within 15% of SI
-        # (allow more tolerance since indirect factor varies by year)
-        adjusted_pgwp = calculated_direct_pgwp * CH4_INDIRECT_EFFECTS_FACTOR
-        assert adjusted_pgwp == pytest.approx(si_value, rel=0.15), (
-            f"pGWP100 CH4 with indirect adjustment at {year}: "
-            f"got {adjusted_pgwp:.1f}, expected {si_value:.1f}"
-        )
+@pytest.mark.parametrize(
+    "iam,ssp,rcp",
+    [
+        ("IMAGE", "SSP1", "2.6"),
+        ("IMAGE", "SSP1", "4.5"),
+        ("AIM", "SSP3", "4.5"),
+        ("AIM", "SSP3", "6.0"),
+        ("GCAM4", "SSP4", "2.6"),
+        ("GCAM4", "SSP4", "4.5"),
+        ("MESSAGE", "SSP2", "4.5"),
+        ("MESSAGE", "SSP2", "6.0"),
+        ("REMIND", "SSP5", "4.5"),
+        ("REMIND", "SSP5", "8.5"),
+    ],
+)
+def test_pgwp100_ch4_all_scenarios_match_si(iam, ssp, rcp):
+    """CH4 pGWP100 should match Watanabe Table S.2 across scenarios."""
+    _assert_pgwp100_ch4_matches_si(iam, ssp, rcp, 2030)
 
 
 def test_pgwp100_n2o_image_ssp1_26():
@@ -458,53 +429,6 @@ def test_pgwp100_n2o_multiple_years():
             f"got {calculated_pgwp:.1f}, expected {si_value:.1f}"
         )
 
-
-@pytest.mark.parametrize(
-    "iam,ssp,rcp",
-    [
-        ("IMAGE", "SSP1", "2.6"),
-        ("IMAGE", "SSP1", "4.5"),
-        ("AIM", "SSP3", "4.5"),
-        ("AIM", "SSP3", "6.0"),
-        ("GCAM4", "SSP4", "2.6"),
-        ("GCAM4", "SSP4", "4.5"),
-        ("MESSAGE", "SSP2", "4.5"),
-        ("MESSAGE", "SSP2", "6.0"),
-        ("REMIND", "SSP5", "4.5"),
-        ("REMIND", "SSP5", "8.5"),
-    ],
-)
-def test_pgwp100_ch4_direct_all_scenarios(iam, ssp, rcp):
-    """
-    Direct pGWP100 for CH4 across all scenarios at year 2030.
-
-    Tests that our direct AGWP implementation, when adjusted for indirect effects,
-    matches the SI table values within 15% tolerance.
-    """
-    ref_df = pd.read_excel(os.path.join(_DATA_DIR, "es5c12391_si_003.xlsx"))
-
-    config.set_scenario(iam=iam, ssp=ssp, rcp=rcp)
-
-    agwp_ch4_val = agwp.agwp_ch4(emission_year=2030, time_horizon=100)
-    agwp_co2_val = agwp.agwp_co2(emission_year=2030, time_horizon=100)
-    calculated_direct_pgwp = agwp_ch4_val / agwp_co2_val
-
-    row = _find_si_row(ref_df, iam, ssp, rcp)
-    assert not row.empty, f"{iam}-{ssp}-{rcp} scenario not found in SI table"
-
-    si_value = row[2030]
-
-    # Direct pGWP should be in expected range (~18-25)
-    assert 15 < calculated_direct_pgwp < 30, (
-        f"Direct pGWP100 CH4 for {iam}-{ssp}-{rcp} outside expected range: {calculated_direct_pgwp:.1f}"
-    )
-
-    # With indirect effects adjustment, should be within 15% of SI
-    adjusted_pgwp = calculated_direct_pgwp * CH4_INDIRECT_EFFECTS_FACTOR
-    assert adjusted_pgwp == pytest.approx(si_value, rel=0.15), (
-        f"pGWP100 CH4 with indirect adjustment for {iam}-{ssp}-{rcp} at 2030: "
-        f"got {adjusted_pgwp:.1f} (direct: {calculated_direct_pgwp:.1f}), expected {si_value:.1f}"
-    )
 
 
 @pytest.mark.parametrize(
@@ -1167,8 +1091,8 @@ def test_pgwp_characterization():
 
     # Allow slightly larger tolerance due to numerical differences in integration methods
     assert calculated_pgwp == pytest.approx(expected_pgwp, rel=0.1)
-    # pGWP for CH4 should be in reasonable range (direct effect ~21-25)
-    assert 15 < expected_pgwp < 40
+    # pGWP for CH4 should be in reasonable range for the Watanabe default mode
+    assert 25 < expected_pgwp < 40
 
 
 def test_pgtp_characterization():
