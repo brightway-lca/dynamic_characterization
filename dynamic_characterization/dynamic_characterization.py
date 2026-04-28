@@ -5,10 +5,8 @@ from datetime import datetime
 from typing import Callable, Dict, Tuple
 from loguru import logger
 
-import bw2data as bd
 import numpy as np
 import pandas as pd
-from bw2data.utils import UnknownObject
 
 from dynamic_characterization.classes import CharacterizedRow
 from dynamic_characterization.ipcc_ar6.radiative_forcing import (
@@ -250,6 +248,16 @@ def create_characterization_functions_from_method(
     """
 
     characterization_functions = dict()
+
+    try:
+        import bw2data as bd
+        from bw2data.utils import UnknownObject
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "bw2data is required to build default characterization functions from an LCIA method. "
+            "Install bw2data with its dependencies, or provide custom characterization_functions "
+            "when calling characterize()."
+        ) from exc
 
     filepath = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
