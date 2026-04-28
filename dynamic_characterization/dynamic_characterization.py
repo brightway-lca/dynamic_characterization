@@ -1,15 +1,12 @@
 import json
 import os
-import warnings
 from collections.abc import Collection
 from datetime import datetime
 from typing import Callable, Dict, Tuple
 from loguru import logger
 
-import bw2data as bd
 import numpy as np
 import pandas as pd
-from bw2data.utils import UnknownObject
 
 from dynamic_characterization.classes import CharacterizedRow
 from dynamic_characterization.ipcc_ar6.radiative_forcing import (
@@ -40,6 +37,7 @@ def characterize(
     characterization_function_co2: Callable = None,
     time_varying_re: bool = False,
     fallback_to_ipcc: bool = True,
+    indirect_effects: str = "all",
 ) -> pd.DataFrame:
     """
     Characterizes the dynamic inventory, formatted as a Dataframe, by evaluating each emission (row in DataFrame) using given dynamic characterization functions.
@@ -88,6 +86,11 @@ def characterize(
     fallback_to_ipcc: bool, optional
         Only for prospective metrics. If True (default), use IPCC AR6 characterization functions for GHGs not available
         in the Watanabe module (e.g., CO and other GHGs). If False, only GHGs available in Watanabe (CO2, CH4, N2O) are characterized.
+    indirect_effects : str
+        Indirect effect treatment. One of:
+        - all: all indirect effects. Matches Watanabe et al. Default.
+        - no_carbon_cyle: all indirect effects except carbon cycle feedbacks.
+        - none: only direct effects of the gasae.
 
     Returns
     -------
@@ -163,6 +166,7 @@ def characterize(
                     original_time_horizon=time_horizon,
                     dynamic_time_horizon=dynamic_time_horizon,
                     time_varying_re=time_varying_re,
+                    indirect_effects=indirect_effects,
                 )
             )
 
@@ -184,6 +188,7 @@ def characterize(
                     row=row,
                     time_horizon=dynamic_time_horizon,
                     time_varying_re=time_varying_re,
+                    indirect_effects=indirect_effects,
                 )
             )
 
@@ -243,6 +248,16 @@ def create_characterization_functions_from_method(
     """
 
     characterization_functions = dict()
+
+    try:
+        import bw2data as bd
+        from bw2data.utils import UnknownObject
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "bw2data is required to build default characterization functions from an LCIA method. "
+            "Install bw2data with its dependencies, or provide custom characterization_functions "
+            "when calling characterize()."
+        ) from exc
 
     filepath = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
@@ -421,6 +436,7 @@ def _characterize_pgwp(
     original_time_horizon,
     dynamic_time_horizon,
     time_varying_re: bool = False,
+    indirect_effects: str = "all",
 ) -> CharacterizedRow:
     """
     Calculate prospective GWP using Watanabe et al. (2026) characterization.
@@ -428,16 +444,23 @@ def _characterize_pgwp(
     Uses AGWP_gas / AGWP_CO2 to calculate kg CO2 equivalent.
     Emission year is extracted from the row's date.
     """
-    # Get emission year from the row date
-    emission_date = row.date
-    emission_year = int(str(emission_date.to_numpy())[:4])
 
     # Calculate AGWP for the gas using its characterization function
-    radiative_forcing_ghg = characterization_functions[row.flow](
-        row,
-        dynamic_time_horizon,
-        time_varying_re=time_varying_re,
-    )
+    char_func = characterization_functions[row.flow]
+    if char_func == prospective_characterize_ch4:
+        # Only CH4 supports indirect_effects
+        radiative_forcing_ghg = char_func(
+            row,
+            dynamic_time_horizon,
+            time_varying_re=time_varying_re,
+            indirect_effects=indirect_effects,
+        )
+    else:
+        radiative_forcing_ghg = char_func(
+            row,
+            dynamic_time_horizon,
+            time_varying_re=time_varying_re,
+        )
 
     # Calculate reference AGWP for 1 kg of CO2
     radiative_forcing_co2 = prospective_characterize_co2(
@@ -533,6 +556,7 @@ def _characterize_prospective_radiative_forcing(
     row,
     time_horizon,
     time_varying_re: bool = False,
+    indirect_effects: str = "all",
 ) -> CharacterizedRow:
     """
     Calculate prospective radiative forcing using Watanabe et al. (2026) characterization.
@@ -550,6 +574,14 @@ def _characterize_prospective_radiative_forcing(
         prospective_characterize_n2o,
     )
 
+    if char_func == prospective_characterize_ch4:
+        # CH4 supports multiple treatments of indirect effects
+        return char_func(
+            row,
+            time_horizon,
+            time_varying_re=time_varying_re,
+            indirect_effects=indirect_effects,
+        )
     if char_func in prospective_functions:
         # Watanabe functions support time_varying_re
         return char_func(row, time_horizon, time_varying_re=time_varying_re)

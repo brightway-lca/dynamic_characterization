@@ -13,8 +13,9 @@ import numpy as np
 
 from dynamic_characterization.classes import CharacterizedRow
 
-from .config import get_scenario
-from .data_loader import (
+from dynamic_characterization.prospective.agwp import _agwp_ch4_cumulative
+from dynamic_characterization.prospective.config import get_scenario
+from dynamic_characterization.prospective.data_loader import (
     load_irf_ch4,
     load_irf_co2,
     load_irf_n2o,
@@ -189,6 +190,7 @@ def characterize_ch4(
     period: int = 100,
     cumulative: bool = False,
     time_varying_re: bool = False,
+    indirect_effects: str = "all",
 ) -> CharacterizedRow:
     """
     Calculate radiative forcing time series for 1 kg CH4 emission.
@@ -196,8 +198,8 @@ def characterize_ch4(
     Uses scenario-based radiative efficiencies from Watanabe et al. (2026).
     Scenario must be set via prospective.set_scenario() before calling.
 
-    This includes only direct effects. For indirect effects (ozone, water vapor),
-    multiply the result by the appropriate factor (~1.43 for GWP100).
+    This can include either only direct effects, indirect effects w/o carbon feedback or all effects.
+    Only including direct effects will reduce values by ~1.43 for GWP100.
 
     Parameters
     ----------
@@ -211,6 +213,11 @@ def characterize_ch4(
     time_varying_re : bool
         If True, use RE that evolves over the decay period.
         If False, use fixed RE from emission year (IPCC standard, default).
+    indirect_effects : str
+        Treatment of indirect CH4 effects. One of:
+        - all: all indirect effects. Matches Watanabe et al. (2026). Default.
+        - no_carbon_cyle: all indirect effects except carbon cycle feedbacks.
+        - none: only direct effects of CH4.
 
     Returns
     -------
@@ -218,48 +225,20 @@ def characterize_ch4(
         namedtuple with date, amount, flow, activity arrays.
         Amount is in W*yr/m^2/kg CH4.
     """
-    scenario = get_scenario()
-    iam, ssp, rcp = scenario["iam"], scenario["ssp"], scenario["rcp"]
-
-    # Load data
-    re_data = load_re_ch4(iam)
-    irf_series = load_irf_ch4()
-
-    years = re_data["_years"]
-    re_series = re_data[ssp][rcp]  # W/m^2/ppb
-
-    # Get emission year from series date
     date_beginning = series.date.to_numpy()
     emission_year = int(str(date_beginning)[:4])
-    year_idx = _get_year_index(emission_year, years)
 
-    # Limit time horizon to available IRF data
-    max_years = min(period, len(irf_series))
+    forcing = _agwp_ch4_cumulative(
+        emission_year=emission_year,
+        time_horizon=period,
+        time_varying_re=time_varying_re,
+        indirect_effects=indirect_effects,
+    )
 
-    # Create date array
     dates_characterized = date_beginning + np.arange(
-        start=0, stop=max_years, dtype="timedelta64[Y]"
+        start=0, stop=len(forcing), dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
-    # Calculate cumulative radiative forcing at each time step
-    # Start from t=1 so forcing[0]=0 (no time elapsed = no forcing yet)
-    forcing = np.zeros(max_years, dtype="float64")
-    cumulative_forcing = 0.0
-
-    for t in range(1, max_years):
-        irf_t = irf_series[t]
-
-        if time_varying_re:
-            re_idx = min(year_idx + t, len(re_series) - 1)
-            re_t = re_series[re_idx]
-        else:
-            re_t = re_series[year_idx]
-
-        delta_forcing = re_t * irf_t * CONST_CH4
-        cumulative_forcing += delta_forcing
-        forcing[t] = cumulative_forcing
-
-    # Scale by emission amount
     forcing = forcing * series.amount
 
     if not cumulative:
