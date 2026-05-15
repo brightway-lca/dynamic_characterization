@@ -40,6 +40,7 @@ def characterize(
     characterization_function_co2: Callable = None,
     time_varying_re: bool = False,
     fallback_to_ipcc: bool = True,
+    characterize_biogenic_uptake: bool = True,
 ) -> pd.DataFrame:
     """
     Characterizes the dynamic inventory, formatted as a Dataframe, by evaluating each emission (row in DataFrame) using given dynamic characterization functions.
@@ -88,7 +89,11 @@ def characterize(
     fallback_to_ipcc: bool, optional
         Only for prospective metrics. If True (default), use IPCC AR6 characterization functions for GHGs not available
         in the Watanabe module (e.g., CO and other GHGs). If False, only GHGs available in Watanabe (CO2, CH4, N2O) are characterized.
-
+    characterize_biogenic_uptake: bool, optional
+        Whether to characterize biogenic uptake flows (e.g. CO2 uptake by soil or biomass, or CDR processes).
+        If True, the default characterization functions include uptake flows and these are characterized with a negative emission profile. Default is True.
+        Set to False if you want to explicitly model uptake outside of the dynamic characterization (e.g. from a forest model)
+        
     Returns
     -------
     pd.DataFrame
@@ -116,7 +121,7 @@ def characterize(
                 functions on."
             )
         characterization_functions = create_characterization_functions_from_method(
-            base_lcia_method, use_prospective=use_prospective, fallback_to_ipcc=fallback_to_ipcc
+            base_lcia_method, use_prospective=use_prospective, fallback_to_ipcc=fallback_to_ipcc, characterize_uptake=characterize_biogenic_uptake
         )
 
     if metric == "GWP" and not characterization_function_co2:
@@ -211,6 +216,7 @@ def create_characterization_functions_from_method(
     base_lcia_method: Tuple[str, ...],
     use_prospective: bool = False,
     fallback_to_ipcc: bool = True,
+    characterize_uptake: bool = True,
 ) -> dict:
     """
     Add default dynamic characterization functions for CO2, CH4, N2O and other GHGs, based on IPCC
@@ -234,6 +240,10 @@ def create_characterization_functions_from_method(
         Only relevant when use_prospective=True. If True (default), use IPCC AR6 characterization functions
         for GHGs not available in the Watanabe module (e.g., CO and other GHGs). If False, only GHGs
         available in Watanabe (CO2, CH4, N2O) are characterized.
+    characterize_uptake: bool, optional
+        Whether to include characterization functions for biogenic uptake flows (e.g. CO2 uptake by soil or biomass, or CDR processes).
+        If True (default), the default characterization functions include uptake. Set to False
+        if you want to explicitly model uptake outside of the dynamic characterization (e.g. from a forest model)
 
     Returns
     -------
@@ -300,16 +310,21 @@ def create_characterization_functions_from_method(
 
     for node in bioflow_nodes:
         if "carbon dioxide" in node["name"].lower():
-            if "soil" in node.get("categories", []):
+            if "soil" in node.get("categories", []) and characterize_uptake:
                 characterization_functions[node.id] = (
                     co2_uptake_func  # negative emission because uptake by soil
                 )
-            elif "in air" in node.get("categories", []) and node.get("type", []) == 'natural resource':
-                # CO2 as a natural resource in air is assumed to be used for uptake in CDR processes
+            elif (
+                "in air" in node.get("categories", [])
+                and node.get("type", []) == "natural resource"
+                and characterize_uptake
+            ):
+                # CO2 as a natural resource in air is assumed to be used for uptake in biomass or CDR processes
                 characterization_functions[node.id] = (
-                    co2_uptake_func  # negative emission because uptake by CDR processes
+                    co2_uptake_func   # negative emission because uptake by biomass or CDR processes
                 )
-            else:
+            # explicitely exlude CO2 flow that are a natural resource, as these are uptake flows
+            elif "in air" in node.get("categories", []) and not "natural resource" in node.get("type", []):
                 characterization_functions[node.id] = co2_func
 
         elif (
