@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 import numpy as np
 import pandas as pd
 
@@ -30,6 +32,85 @@ def IRF_co2(year) -> callable:
     )
 
 
+# The decay-multiplier arrays below depend only on `period`, not on the emission
+# row, so they were previously recomputed for every row of the inventory. They are
+# memoized here and returned read-only; callers only ever multiply by them.
+@lru_cache(maxsize=None)
+def _co2_decay_multipliers(period: int) -> np.ndarray:
+    radiative_efficiency_ppb = 1.33e-5
+    M_co2 = 44.01
+    M_air = 28.97
+    m_atmosphere = 5.135e18
+    radiative_efficiency_kg = (
+        radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere
+    )
+    arr = np.array(
+        [radiative_efficiency_kg * IRF_co2(year) for year in range(period)]
+    )
+    arr.setflags(write=False)
+    return arr
+
+
+@lru_cache(maxsize=None)
+def _co_decay_multipliers(period: int) -> np.ndarray:
+    radiative_efficiency_ppb = 1.33e-5
+    M_co2 = 44.01
+    M_co = 28.01
+    M_air = 28.97
+    m_atmosphere = 5.135e18
+    radiative_efficiency_kg = (
+        radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere
+    )
+    arr = np.array(
+        [
+            M_co2 / M_co * radiative_efficiency_kg * IRF_co2(year)
+            for year in range(period)
+        ]
+    )
+    arr.setflags(write=False)
+    return arr
+
+
+@lru_cache(maxsize=None)
+def _ch4_decay_multipliers(period: int) -> np.ndarray:
+    radiative_efficiency_ppb = 5.7e-4
+    M_ch4 = 16.04
+    M_air = 28.97
+    m_atmosphere = 5.135e18
+    radiative_efficiency_kg = (
+        radiative_efficiency_ppb * M_air / M_ch4 * 1e9 / m_atmosphere
+    )
+    tau = 11.8
+    arr = np.array(
+        [
+            radiative_efficiency_kg * tau * (1 - np.exp(-year / tau))
+            for year in range(period)
+        ]
+    )
+    arr.setflags(write=False)
+    return arr
+
+
+@lru_cache(maxsize=None)
+def _n2o_decay_multipliers(period: int) -> np.ndarray:
+    radiative_efficiency_ppb = 2.8e-3
+    M_n2o = 44.01
+    M_air = 28.97
+    m_atmosphere = 5.135e18
+    radiative_efficiency_kg = (
+        radiative_efficiency_ppb * M_air / M_n2o * 1e9 / m_atmosphere
+    )
+    tau = 109
+    arr = np.array(
+        [
+            radiative_efficiency_kg * tau * (1 - np.exp(-year / tau))
+            for year in range(period)
+        ]
+    )
+    arr.setflags(write=False)
+    return arr
+
+
 def characterize_co2(
     series,
     period: int | None = 100,
@@ -60,28 +141,12 @@ def characterize_co2(
     Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
     """
 
-    # functional variables and units (from publications listed in docstring)
-    radiative_efficiency_ppb = (
-        1.33e-5  # W/m2/ppb; 2019 background co2 concentration; IPCC AR6 Table 7.15
-    )
-
-    # for conversion from ppb to kg-CO2
-    M_co2 = 44.01  # g/mol
-    M_air = 28.97  # g/mol, dry air
-    m_atmosphere = 5.135e18  # kg [Trenberth and Smith, 2005]
-
-    radiative_efficiency_kg = (
-        radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere
-    )  # W/m2/kg-CO2
-
     date_beginning: np.datetime64 = series.date.to_numpy()
     dates_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
-    decay_multipliers: np.ndarray = np.array(
-        [radiative_efficiency_kg * IRF_co2(year) for year in range(period)]
-    )
+    decay_multipliers = _co2_decay_multipliers(period)
 
     forcing = np.array(series.amount * decay_multipliers, dtype="float64")
 
@@ -128,28 +193,12 @@ def characterize_co2_uptake(
     Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
     """
 
-    # functional variables and units (from publications listed in docstring)
-    radiative_efficiency_ppb = (
-        1.33e-5  # W/m2/ppb; 2019 background co2 concentration; IPCC AR6 Table 7.15
-    )
-
-    # for conversion from ppb to kg-CO2
-    M_co2 = 44.01  # g/mol
-    M_air = 28.97  # g/mol, dry air
-    m_atmosphere = 5.135e18  # kg [Trenberth and Smith, 2005]
-
-    radiative_efficiency_kg = (
-        radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere
-    )  # W/m2/kg-CO2
-
     date_beginning: np.datetime64 = series.date.to_numpy()
     dates_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
-    decay_multipliers: np.ndarray = np.array(
-        [radiative_efficiency_kg * IRF_co2(year) for year in range(period)]
-    )
+    decay_multipliers = _co2_decay_multipliers(period)
 
     forcing = np.array(series.amount * decay_multipliers, dtype="float64")
 
@@ -201,32 +250,12 @@ def characterize_co(
     Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
     """
 
-    # functional variables and units (from publications listed in docstring)
-    radiative_efficiency_ppb = (
-        1.33e-5  # W/m2/ppb; 2019 background co2 concentration; IPCC AR6 Table 7.15
-    )
-
-    # for conversion from ppb to kg-CO2
-    M_co2 = 44.01  # g/mol
-    M_co = 28.01  # g/mol
-    M_air = 28.97  # g/mol, dry air
-    m_atmosphere = 5.135e18  # kg [Trenberth and Smith, 2005]
-
-    radiative_efficiency_kg = (
-        radiative_efficiency_ppb * M_air / M_co2 * 1e9 / m_atmosphere
-    )  # W/m2/kg-CO2
-
     date_beginning: np.datetime64 = series.date.to_numpy()
     dates_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
-    decay_multipliers: np.ndarray = np.array(
-        [
-            M_co2 / M_co * radiative_efficiency_kg * IRF_co2(year)
-            for year in range(period)
-        ]  # <-- Scaling from co2 to co is done here
-    )
+    decay_multipliers = _co_decay_multipliers(period)
 
     forcing = np.array(series.amount * decay_multipliers, dtype="float64")
 
@@ -287,31 +316,12 @@ def characterize_ch4(
     Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
     """
 
-    # functional variables and units (from publications listed in docstring)
-    radiative_efficiency_ppb = 5.7e-4  # # W/m2/ppb; 2019 background cch4 concentration; IPCC AR6 Table 7.15. This number includes indirect effects.
-
-    # for conversion from ppb to kg-CH4
-    M_ch4 = 16.04  # g/mol
-    M_air = 28.97  # g/mol, dry air
-    m_atmosphere = 5.135e18  # kg [Trenberth and Smith, 2005]
-
-    radiative_efficiency_kg = (
-        radiative_efficiency_ppb * M_air / M_ch4 * 1e9 / m_atmosphere
-    )  # W/m2/kg-CH4
-
-    tau = 11.8  # Lifetime (years)
-
     date_beginning: np.datetime64 = series.date.to_numpy()
     dates_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
-    decay_multipliers: list = np.array(
-        [
-            radiative_efficiency_kg * tau * (1 - np.exp(-year / tau))
-            for year in range(period)
-        ]
-    )
+    decay_multipliers = _ch4_decay_multipliers(period)
 
     forcing = np.array(series.amount * decay_multipliers, dtype="float64")
 
@@ -365,31 +375,12 @@ def characterize_n2o(
     Forster2023: Updated numerical values from IPCC AR6 Chapter 7 (Table 7.15): https://doi.org/10.1017/9781009157896.009
     """
 
-    # functional variables and units (from publications listed in docstring)
-    radiative_efficiency_ppb = 2.8e-3  # # W/m2/ppb; 2019 background cch4 concentration; IPCC AR6 Table 7.15. This number includes indirect effects.
-
-    # for conversion from ppb to kg-CH4
-    M_n2o = 44.01  # g/mol
-    M_air = 28.97  # g/mol, dry air
-    m_atmosphere = 5.135e18  # kg [Trenberth and Smith, 2005]
-
-    radiative_efficiency_kg = (
-        radiative_efficiency_ppb * M_air / M_n2o * 1e9 / m_atmosphere
-    )  # W/m2/kg-N2O
-
-    tau = 109  # Lifetime (years)
-
     date_beginning: np.datetime64 = series.date.to_numpy()
     dates_characterized: np.ndarray = date_beginning + np.arange(
         start=0, stop=period, dtype="timedelta64[Y]"
     ).astype("timedelta64[s]")
 
-    decay_multipliers: list = np.array(
-        [
-            radiative_efficiency_kg * tau * (1 - np.exp(-year / tau))
-            for year in range(period)
-        ]
-    )
+    decay_multipliers = _n2o_decay_multipliers(period)
 
     forcing = np.array(series.amount * decay_multipliers, dtype="float64")
     if not cumulative:

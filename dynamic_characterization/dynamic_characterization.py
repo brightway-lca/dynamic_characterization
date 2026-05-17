@@ -1,6 +1,8 @@
+import inspect
 import json
 import os
 import warnings
+from collections import namedtuple
 from collections.abc import Collection
 from datetime import datetime
 from typing import Callable, Dict, Tuple
@@ -27,6 +29,17 @@ from dynamic_characterization.prospective.radiative_forcing import (
     characterize_co2_uptake as prospective_characterize_co2_uptake,
     characterize_n2o as prospective_characterize_n2o,
 )
+
+
+# Building the default characterization functions reloads decay_multipliers.json and
+# issues one biosphere DB query per method flow. The result only depends on the BW
+# project, the method, and the boolean flags, so it is memoized across calls.
+_CHARACTERIZATION_FUNCTION_CACHE = {}
+
+
+def clear_characterization_function_cache() -> None:
+    """Clear the memoized default characterization functions (e.g. after editing a method)."""
+    _CHARACTERIZATION_FUNCTION_CACHE.clear()
 
 
 def characterize(
@@ -127,6 +140,19 @@ def characterize(
     if metric == "GWP" and not characterization_function_co2:
         characterization_function_co2 = characterize_co2
 
+    # Fast path: for the (default) radiative_forcing metric without a fixed time
+    # horizon, every row of a given flow uses the same characterization function
+    # with the same period. The per-emission response is linear in the emission
+    # amount and its shape is independent of the emission date, so we can evaluate
+    # each characterization function once per flow and broadcast over all its rows
+    # instead of iterating the inventory row by row.
+    if metric == "radiative_forcing" and not fixed_time_horizon:
+        vectorized = _vectorized_radiative_forcing(
+            dynamic_inventory_df, characterization_functions, time_horizon
+        )
+        if vectorized is not None:
+            return vectorized
+
     characterized_inventory_data = []
 
     for row in dynamic_inventory_df.itertuples(index=False):
@@ -212,6 +238,116 @@ def characterize(
     return characterized_inventory
 
 
+_VectorizationRow = namedtuple(
+    "_VectorizationRow", ["date", "amount", "flow", "activity"]
+)
+
+
+def _vectorized_radiative_forcing(
+    dynamic_inventory_df: pd.DataFrame,
+    characterization_functions: Dict[int, Callable],
+    period: int,
+):
+    """
+    Vectorized evaluation of the ``radiative_forcing`` metric without a fixed
+    time horizon.
+
+    Each characterization function is evaluated once per flow (in cumulative
+    mode, giving the signed per-unit decay array) and then broadcast over all
+    inventory rows of that flow. ``np.diff`` is applied to ``amount * decay``
+    exactly as in the per-row implementation, so the result is bit-for-bit
+    identical to the row-by-row loop.
+
+    Returns the characterized inventory DataFrame, or ``None`` to signal that
+    the caller should fall back to the generic row-by-row loop (nothing to
+    characterize, a function without a ``cumulative`` keyword, or an unexpected
+    response length).
+    """
+    flow_values = dynamic_inventory_df["flow"].to_numpy()
+    known = np.fromiter(
+        (f in characterization_functions for f in flow_values),
+        dtype=bool,
+        count=len(flow_values),
+    )
+    if not known.any():
+        return None  # let the row loop emit the "nothing to characterize" warning
+
+    df = dynamic_inventory_df.loc[known]
+    dates_all = df["date"].to_numpy()
+    amounts_all = df["amount"].to_numpy().astype("float64")
+    flows_all = df["flow"].to_numpy()
+    activities_all = df["activity"].to_numpy()
+
+    # timedelta offsets identical to those built inside every IPCC AR6 / generic
+    # characterization function
+    offsets = np.arange(start=0, stop=period, dtype="timedelta64[Y]").astype(
+        "timedelta64[s]"
+    )
+
+    date_blocks = []
+    amount_blocks = []
+    flow_blocks = []
+    activity_blocks = []
+
+    for flow_id in pd.unique(flows_all):
+        func = characterization_functions[flow_id]
+
+        # The fast path calls the function in cumulative mode to obtain the
+        # signed per-unit decay array. If it does not accept `cumulative`, or
+        # returns an unexpected length, fall back to the safe row loop.
+        try:
+            params = inspect.signature(func).parameters
+        except (TypeError, ValueError):
+            return None
+        if "cumulative" not in params:
+            return None
+
+        mask = flows_all == flow_id
+        sub_dates = dates_all[mask]
+        sub_amounts = amounts_all[mask]
+        sub_activities = activities_all[mask]
+
+        sample = _VectorizationRow(
+            date=pd.Timestamp(sub_dates[0]),
+            amount=1.0,
+            flow=flow_id,
+            activity=sub_activities[0],
+        )
+        unit_cumulative = np.asarray(
+            func(sample, period, cumulative=True).amount, dtype="float64"
+        )
+        if unit_cumulative.shape != (period,):
+            return None
+
+        # forcing[i, k] = amount_i * decay_k, then marginalized with np.diff,
+        # exactly reproducing the per-row `np.diff(amount * decay, prepend=0)`
+        forcing = sub_amounts[:, None] * unit_cumulative[None, :]
+        forcing = np.diff(forcing, prepend=0, axis=1)
+
+        n = sub_amounts.shape[0]
+        date_blocks.append((sub_dates[:, None] + offsets[None, :]).reshape(-1))
+        amount_blocks.append(forcing.reshape(-1))
+        flow_blocks.append(np.full(n * period, flow_id))
+        activity_blocks.append(np.repeat(sub_activities, period))
+
+    characterized_inventory = (
+        pd.DataFrame(
+            {
+                "date": np.concatenate(date_blocks),
+                "amount": np.concatenate(amount_blocks),
+                "flow": np.concatenate(flow_blocks),
+                "activity": np.concatenate(activity_blocks),
+            }
+        )
+        .astype({"date": "datetime64[s]", "amount": "float64"})
+        .query("amount != 0")[["date", "amount", "flow", "activity"]]
+        .sort_values(by=["date", "amount"])
+        .reset_index(drop=True)
+    )
+
+    return characterized_inventory
+
+
 def create_characterization_functions_from_method(
     base_lcia_method: Tuple[str, ...],
     use_prospective: bool = False,
@@ -251,6 +387,17 @@ def create_characterization_functions_from_method(
         Dictionary mapping biosphere flow IDs to characterization functions.
 
     """
+
+    cache_key = (
+        bd.projects.current,
+        tuple(base_lcia_method),
+        use_prospective,
+        fallback_to_ipcc,
+        characterize_uptake,
+    )
+    cached = _CHARACTERIZATION_FUNCTION_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
 
     characterization_functions = dict()
 
@@ -352,6 +499,7 @@ def create_characterization_functions_from_method(
                         characterization_functions[node.id] = (
                             create_generic_characterization_function(np.array(decay_series))
                         )
+    _CHARACTERIZATION_FUNCTION_CACHE[cache_key] = characterization_functions
     return characterization_functions
 
 
