@@ -36,6 +36,7 @@ dependencies = [
     "loguru",
     "matplotlib>=3.9.4",
     "openpyxl>=3.1.5",
+    "pyyaml",
 ]
 
 [project.urls]
@@ -60,17 +61,19 @@ dev = [
     "pytest-randomly",
     "setuptools",
 ]
+fair = ["fair>=2.1"]
 
 [tool.setuptools]
 license-files = ["LICENSE"]
 package-dir = { "" = "."}
 include-package-data = true
-package-data = {dynamic_characterization = ["ipcc_ar6/data/*.json", "ipcc_ar6/data/*.csv", "prospective/data/*.xlsx"]}
+package-data = {dynamic_characterization = ["ipcc_ar6/data/*.json", "ipcc_ar6/data/*.csv", "prospective/data/*.xlsx", "fair/data/*.yaml"]}
 packages = [
     "dynamic_characterization",
     "dynamic_characterization.original_temporalis_functions",
     "dynamic_characterization.ipcc_ar6",
     "dynamic_characterization.prospective",
+    "dynamic_characterization.fair",
     ]
 
 [tool.setuptools.dynamic]
