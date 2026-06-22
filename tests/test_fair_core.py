@@ -116,6 +116,30 @@ def test_emissions_by_species_aggregates_and_signs():
     np.testing.assert_allclose(by_species["CO2 FFI"], [10.0, -5.0])
 
 
+def test_zero_row_inventory_returns_empty():
+    empty = pd.DataFrame(
+        {"date": pd.to_datetime([]), "amount": [], "flow": [], "activity": []}
+    )
+    out = core.characterize_with_fair(empty)
+    assert list(out.columns) == ["date", "amount", "flow", "activity", "quantile"]
+    assert len(out) == 0
+
+
+def test_unmapped_flows_warn_and_return_empty():
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2030-01-01"]),
+            "amount": [1.0],
+            "flow": [999],
+            "activity": ["a"],
+            "flow_name": ["Some unmappable flow"],
+        }
+    )
+    out = core.characterize_with_fair(df)
+    assert list(out.columns) == ["date", "amount", "flow", "activity", "quantile"]
+    assert len(out) == 0
+
+
 def test_characterize_with_fair_runs(monkeypatch):
     pytest.importorskip("fair")
     import dynamic_characterization.prospective.config as cfg  # noqa

@@ -6,6 +6,7 @@ from typing import Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+from loguru import logger
 
 from ..prospective import config
 from . import allocation, runner, species_map
@@ -67,17 +68,25 @@ def characterize_with_fair(
     workers: Optional[int] = None,
 ) -> pd.DataFrame:
     """Run FAIR and return ΔRF/ΔT per (year, flow, activity, quantile)."""
-    runner.require_fair()  # fail fast with a clear message
-    marker = config.current_fair_marker()
+    # Guard: empty inventory must return early, before require_fair()
+    EMPTY = pd.DataFrame(columns=["date", "amount", "flow", "activity", "quantile"])
+    if dynamic_inventory_df.empty:
+        return EMPTY
 
     years = _emission_years(dynamic_inventory_df, time_horizon)
     by_species, flow_records = _inventory_emissions_by_species(
         dynamic_inventory_df, years
     )
     if not by_species:
-        return pd.DataFrame(
-            columns=["date", "amount", "flow", "activity", "quantile"]
+        logger.warning(
+            "No inventory flows could be mapped to FAIR species. Ensure the "
+            "inventory carries flow names (a 'flow_name' column) and that the "
+            "species map covers them."
         )
+        return EMPTY
+
+    runner.require_fair()  # fail fast with a clear message
+    marker = config.current_fair_marker()
 
     baseline = runner.run_fair(marker, None, years, output)  # (cfg, yr)
 
