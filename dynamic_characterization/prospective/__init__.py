@@ -11,8 +11,13 @@ from . import agtp
 from . import agwp
 from .config import (
     VALID_SCENARIOS,
+    SCENARIO_REGISTRY,
+    available_scenarios,
+    current_fair_marker,
     get_scenario,
+    metric_family,
     reset_scenario,
+    scenario_supports,
     set_scenario,
 )
 from .data_loader import (
@@ -34,8 +39,13 @@ __all__ = [
     "agtp",
     "agwp",
     "VALID_SCENARIOS",
+    "SCENARIO_REGISTRY",
+    "available_scenarios",
+    "current_fair_marker",
     "get_scenario",
+    "metric_family",
     "reset_scenario",
+    "scenario_supports",
     "set_scenario",
     "load_irf_ch4",
     "load_irf_co2",
