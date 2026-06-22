@@ -201,7 +201,7 @@ Both metrics return a **long DataFrame** with an extra `quantile` column compare
 | 2020-01-01 | 4.1e-14 | 1 | 2 | 50.0 |
 | ... | ... | ... | ... | ... |
 
-Each row represents the characterization result for one (year, flow, activity, quantile) combination. The default quantiles are `(2.5, 25, 50, 75, 97.5)`. The output is attributed **per flow and per activity**, allowing disaggregated analysis of the inventory.
+Each row represents the characterization result for one (year, flow, activity, quantile) combination. The default quantiles are `(2.5, 25, 50, 75, 97.5)`. The output is attributed **per flow and per activity**, allowing disaggregated analysis of the inventory. For FAIR metrics, `time_horizon` sets the analysis end as (last emission year + time_horizon) and defaults to the scenario end year (2100) when not given or None.
 
 ### Setting up a FAIR scenario
 
@@ -255,16 +255,26 @@ The following scenarios currently support FAIR metrics (12 total: 8 FAIR-native 
 ### Running FAIR characterization
 
 ```python
-from dynamic_characterization.fair.core import characterize_with_fair
-import dynamic_characterization.prospective as prospective
+from dynamic_characterization import characterize
+from dynamic_characterization.prospective import set_scenario, available_scenarios
 
-prospective.set_scenario(iam="FAIR", ssp="SSP2", rcp="4.5")
+# Pick a FAIR-capable scenario (see available_scenarios("fair"))
+set_scenario("FAIR", "SSP2", "4.5")
 
-df_rf = characterize_with_fair(
+# Returns a long DataFrame with columns
+# ["date", "amount", "flow", "activity", "quantile"]
+df_rf = characterize(
     dynamic_inventory_df,
-    output="radiative_forcing",  # or "temperature"
-    quantiles=(2.5, 25, 50, 75, 97.5),  # default
-    time_horizon=100,              # years beyond last emission; None -> 2100
+    metric="fair_radiative_forcing",   # ΔRF in W/m²
+    base_lcia_method=("EF v3.1", "climate change", "global warming potential (GWP100)"),
+    time_horizon=100,   # analysis end = last emission year + time_horizon; None -> 2100
+)
+
+# Temperature anomaly (ΔT in K):
+df_temp = characterize(
+    dynamic_inventory_df,
+    metric="fair_temperature",
+    base_lcia_method=("EF v3.1", "climate change", "global warming potential (GWP100)"),
 )
 ```
 
