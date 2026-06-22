@@ -1,5 +1,6 @@
 """Resolve dynamic-inventory flow names to FAIR species and signs."""
 
+import copy
 import os
 from functools import lru_cache
 from typing import Dict, Optional, Tuple
@@ -12,7 +13,7 @@ def _data_path() -> str:
 
 
 @lru_cache(maxsize=1)
-def load_species_map() -> Dict:
+def _load_species_map_cached() -> Dict:
     with open(_data_path()) as fh:
         raw = yaml.safe_load(fh)
     raw.setdefault("species", {})
@@ -23,6 +24,10 @@ def load_species_map() -> Dict:
     return raw
 
 
+def load_species_map() -> Dict:
+    return copy.deepcopy(_load_species_map_cached())
+
+
 def resolve_species(
     flow_name: str, cas: Optional[str] = None
 ) -> Tuple[Optional[str], int]:
@@ -30,7 +35,7 @@ def resolve_species(
     Map a flow name to a FAIR species and emission sign.
 
     Returns (species_or_None, sign). Uptake flows ("in air" CO2 resources,
-    explicit uptake) get sign -1. Unmappable flows return (None, 1).
+    explicit uptake) get sign -1. Unmappable flows return (None, sign).
     """
     name = flow_name.lower()
     mapping = load_species_map()

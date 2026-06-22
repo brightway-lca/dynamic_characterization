@@ -34,8 +34,9 @@ def test_co2_uptake_negative_sign():
 
 
 def test_methane_resolves():
-    sp, _ = species_map.resolve_species("Methane, fossil")
+    sp, sign = species_map.resolve_species("Methane, fossil")
     assert sp == "CH4"
+    assert sign == 1
 
 
 def test_precursor_maps_to_response_channel():
@@ -46,5 +47,6 @@ def test_precursor_maps_to_response_channel():
 
 
 def test_unmappable_flow_returns_none():
-    sp, _ = species_map.resolve_species("Occupation, forest")
+    sp, sign = species_map.resolve_species("Occupation, forest")
     assert sp is None
+    assert sign == 1
