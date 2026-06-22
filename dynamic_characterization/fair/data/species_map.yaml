@@ -1,0 +1,22 @@
+# Flow-name substrings (lowercase) -> FAIR species. First match wins.
+# `sign` defaults to +1; uptake / "in air" resource flows get -1 (set in code).
+species:
+  "carbon dioxide": "CO2 FFI"
+  "carbon monoxide": "CO"
+  "methane": "CH4"
+  "dinitrogen monoxide": "N2O"
+  "sulfur dioxide": "Sulfur"
+  "nitrogen oxides": "NOx"
+  "ammonia": "NH3"
+  "nmvoc": "VOC"
+  "non-methane volatile": "VOC"
+  "carbon, in air": "CO2 AFOLU"
+# Precursor species -> FAIR forcing response channel.
+precursors:
+  "NOx": "Ozone"
+  "VOC": "Ozone"
+  "CO": "Ozone"
+  "Sulfur": "Aerosol-radiation interactions"
+  "NH3": "Aerosol-radiation interactions"
+# Species whose default emission sign is negative (uptake).
+negative_sign_species: []
