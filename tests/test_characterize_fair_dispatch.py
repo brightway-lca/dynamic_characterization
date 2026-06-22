@@ -47,7 +47,6 @@ def test_fair_metric_dispatches_to_core(monkeypatch):
             columns=["date", "amount", "flow", "activity", "quantile"]
         )
 
-    monkeypatch.setattr(dcmod, "_characterize_with_fair", fake, raising=False)
     # patch the lazily-imported symbol used inside characterize
     import dynamic_characterization.fair.core as core
     monkeypatch.setattr(core, "characterize_with_fair", fake)
@@ -55,8 +54,15 @@ def test_fair_metric_dispatches_to_core(monkeypatch):
     assert called["output"] == "radiative_forcing"
 
 
+def test_fair_metric_without_any_scenario_raises():
+    # No set_scenario call (autouse fixture resets it).
+    with pytest.raises(ValueError, match="no scenario is set"):
+        dc.characterize(_inv(), metric="fair_temperature")
+
+
 def test_add_fair_flow_names_is_best_effort():
     # No bw2 project/biosphere needed: helper must not raise, returns a frame.
     df = _inv()
     out = dcmod._add_fair_flow_names(df)
     assert "flow" in out.columns  # never crashes; may or may not add flow_name
+    assert len(out) == len(df)  # frame is not lost

@@ -37,7 +37,7 @@ def _add_fair_flow_names(dynamic_inventory_df):
 
     Looks up names from the biosphere database. Never raises: if the project /
     biosphere / a node is unavailable, the (possibly partial) frame is returned
-    unchanged so the FAIR path degrades gracefully (and warns) instead of
+    unchanged so the FAIR path degrades gracefully (logs at debug level) instead of
     crashing. If a 'flow_name' column already exists it is left untouched.
     """
     if "flow_name" in dynamic_inventory_df.columns:
@@ -55,7 +55,8 @@ def _add_fair_flow_names(dynamic_inventory_df):
         return dynamic_inventory_df.assign(
             flow_name=dynamic_inventory_df["flow"].map(names)
         )
-    except Exception:
+    except Exception as exc:
+        logger.debug("Could not enrich inventory with flow names: {}", exc)
         return dynamic_inventory_df
 
 
@@ -162,10 +163,19 @@ def characterize(
         "fair_temperature": "temperature",
     }
     if metric in fair_outputs:
-        if not _prospective_config.scenario_supports("fair"):
+        try:
+            supported = _prospective_config.scenario_supports("fair")
+        except RuntimeError as exc:
+            raise ValueError(
+                f"Metric {metric!r} requires a fair-capable scenario, but no "
+                f"scenario is set. Call set_scenario(iam, ssp, rcp) first. "
+                f"Fair-capable scenarios: "
+                f"{_prospective_config.available_scenarios('fair')}"
+            ) from exc
+        if not supported:
             raise ValueError(
                 f"Metric {metric!r} requires a fair-capable scenario. "
-                f"Set one via set_scenario(...). Fair-capable scenarios: "
+                f"Fair-capable scenarios: "
                 f"{_prospective_config.available_scenarios('fair')}"
             )
         enriched = _add_fair_flow_names(dynamic_inventory_df)
