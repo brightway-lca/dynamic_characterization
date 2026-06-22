@@ -176,6 +176,98 @@ df_pgwp = characterize(
 )
 ```
 
+## FAIR climate model (optional)
+
+The `fair` module provides **FAIR-based dynamic characterization** using the [FaIR](https://github.com/OMS-NetZero/FAIR) simple climate model. Unlike the per-species impulse-response approach used by the other metrics, FAIR runs a full climate-model ensemble and returns probabilistic results across hundreds of calibrated configurations.
+
+Install the optional dependency with:
+
+```console
+$ pip install dynamic_characterization[fair]
+```
+
+### FAIR metrics
+
+Two metrics are available:
+
+- **`fair_radiative_forcing`** — change in total radiative forcing (ΔRF, W/m²) attributable to the inventory emissions, per year.
+- **`fair_temperature`** — change in global mean surface temperature (ΔT, K) attributable to the inventory emissions, per year.
+
+Both metrics return a **long DataFrame** with an extra `quantile` column compared to the standard output format:
+
+| date | amount | flow | activity | quantile |
+|------|--------|------|----------|----------|
+| 2020-01-01 | 3.2e-14 | 1 | 2 | 2.5 |
+| 2020-01-01 | 4.1e-14 | 1 | 2 | 50.0 |
+| ... | ... | ... | ... | ... |
+
+Each row represents the characterization result for one (year, flow, activity, quantile) combination. The default quantiles are `(2.5, 25, 50, 75, 97.5)`. The output is attributed **per flow and per activity**, allowing disaggregated analysis of the inventory.
+
+### Setting up a FAIR scenario
+
+FAIR metrics require a scenario to be set first (same `set_scenario` call as for prospective metrics):
+
+```python
+import dynamic_characterization.prospective as prospective
+
+# FAIR-native scenario (IAM-agnostic marker):
+prospective.set_scenario(iam="FAIR", ssp="SSP2", rcp="4.5")
+
+# Or a dual prospective+FAIR scenario (also supports pGWP etc.):
+prospective.set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
+```
+
+FAIR-native scenarios use `iam="FAIR"`. Dual scenarios (IAM-based) support both prospective and FAIR metrics.
+
+If the current scenario does not support FAIR metrics (or if no scenario has been set), the metrics raise a clear `ValueError`.
+
+### Available FAIR-capable scenarios
+
+Use `available_scenarios("fair")` to list FAIR-capable scenarios programmatically:
+
+```python
+from dynamic_characterization.prospective import available_scenarios
+
+# Scenarios that support fair_radiative_forcing / fair_temperature:
+available_scenarios("fair")
+
+# Scenarios that support pGWP / pGTP / prospective_radiative_forcing:
+available_scenarios("prospective")
+```
+
+The following scenarios currently support FAIR metrics (12 total: 8 FAIR-native markers + 4 dual prospective+FAIR scenarios):
+
+| IAM | SSP | RCP | Notes |
+|-----|-----|-----|-------|
+| FAIR | SSP1 | 1.9 | FAIR-native |
+| FAIR | SSP1 | 2.6 | FAIR-native |
+| FAIR | SSP2 | 4.5 | FAIR-native |
+| FAIR | SSP3 | 7.0 | FAIR-native |
+| FAIR | SSP4 | 3.4 | FAIR-native |
+| FAIR | SSP4 | 6.0 | FAIR-native |
+| FAIR | SSP5 | 3.4-over | FAIR-native |
+| FAIR | SSP5 | 8.5 | FAIR-native |
+| GCAM4 | SSP4 | 6.0 | dual (prospective + FAIR) |
+| IMAGE | SSP1 | 2.6 | dual (prospective + FAIR) |
+| MESSAGE | SSP2 | 4.5 | dual (prospective + FAIR) |
+| REMIND | SSP5 | 8.5 | dual (prospective + FAIR) |
+
+### Running FAIR characterization
+
+```python
+from dynamic_characterization.fair.core import characterize_with_fair
+import dynamic_characterization.prospective as prospective
+
+prospective.set_scenario(iam="FAIR", ssp="SSP2", rcp="4.5")
+
+df_rf = characterize_with_fair(
+    dynamic_inventory_df,
+    output="radiative_forcing",  # or "temperature"
+    quantiles=(2.5, 25, 50, 75, 97.5),  # default
+    time_horizon=100,              # years beyond last emission; None -> 2100
+)
+```
+
 ## What do dynamic characterization functions look like?
 
 Here's an example of what such a function could look like:

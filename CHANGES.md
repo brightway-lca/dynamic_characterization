@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - (2026-06-22)
+* Add optional FAIR climate-model path with `fair_radiative_forcing` (ΔRF, W/m²) and `fair_temperature` (ΔT, K) metrics
+* FAIR metrics return probabilistic ensemble results with per-flow/activity attribution and configurable quantiles (default: 2.5, 25, 50, 75, 97.5 percentiles)
+* Superset scenario registry now covers 12 FAIR-capable scenarios (8 FAIR-native SSP markers + 4 dual prospective+FAIR scenarios)
+* Add `available_scenarios(metric)` to programmatically list scenarios supporting a given metric or metric family (`"fair"`, `"prospective"`, `"pGWP"`, etc.)
+
 ## [1.4.0] - (2026-05-17)
 * Add caching
 * Vectorize radiative forcing calculations
