@@ -35,5 +35,14 @@ def test_find_calibration_files_returns_tuple():
     pytest.importorskip("fair")
     params, props = runner.find_calibration_files()
     # Either both found or both None, but always a 2-tuple
-    assert (params is None) == (props is None) or True
+    assert (params is None) == (props is None)
     assert isinstance((params, props), tuple)
+
+
+def test_run_fair_rejects_bad_output():
+    import pytest
+
+    with pytest.raises(ValueError, match="output must be"):
+        runner.run_fair(
+            "ssp245", None, __import__("numpy").array([2030, 2031]), output="bogus"
+        )

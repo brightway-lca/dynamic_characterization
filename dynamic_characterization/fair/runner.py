@@ -25,14 +25,13 @@ def require_fair():
     """Import and return the `fair` module, or raise a clear ImportError."""
     try:
         import fair  # noqa: WPS433 (lazy, optional)
-    except ImportError as exc:  # pragma: no cover - exercised when fair absent
+    except ImportError as exc:
         raise ImportError(FAIR_IMPORT_ERROR_MSG) from exc
     return fair
 
 
-def _find_in_fair(filenames) -> Optional[str]:
-    fair = require_fair()
-    root = os.path.dirname(os.path.abspath(fair.__file__))
+def _find_in_fair(fair_module, filenames) -> Optional[str]:
+    root = os.path.dirname(os.path.abspath(fair_module.__file__))
     for name in filenames:
         hits = glob.glob(os.path.join(root, "**", name), recursive=True)
         if hits:
@@ -42,7 +41,10 @@ def _find_in_fair(filenames) -> Optional[str]:
 
 def find_calibration_files() -> Tuple[Optional[str], Optional[str]]:
     """Locate (parameters_csv, properties_csv) inside the installed fair pkg."""
-    return _find_in_fair(_PARAM_CANDIDATES), _find_in_fair(_PROP_CANDIDATES)
+    fair = require_fair()
+    return _find_in_fair(fair, _PARAM_CANDIDATES), _find_in_fair(
+        fair, _PROP_CANDIDATES
+    )
 
 
 def run_fair(
@@ -58,6 +60,10 @@ def run_fair(
 
     The actual f.run() is serialized under a module lock.
     """
+    if output not in ("radiative_forcing", "temperature"):
+        raise ValueError(
+            f"output must be 'radiative_forcing' or 'temperature', not {output!r}"
+        )
     fair = require_fair()
     params_csv, props_csv = find_calibration_files()
 
