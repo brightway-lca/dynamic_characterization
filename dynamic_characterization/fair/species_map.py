@@ -25,6 +25,13 @@ def _load_species_map_cached() -> Dict:
 
 
 def load_species_map() -> Dict:
+    """
+    Load species mapping from YAML, including precursor metadata.
+
+    The returned dict includes a 'precursors' key with informational metadata
+    documenting which forcing channel each precursor drives in FAIR; these are
+    not used for routing (FAIR applies precursor responses natively).
+    """
     return copy.deepcopy(_load_species_map_cached())
 
 

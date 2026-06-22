@@ -78,6 +78,25 @@ core = _load_fair("core", "core.py")
 
 
 # ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _reset_scenario():
+    """Reset scenario state before and after each test."""
+    try:
+        core.config.reset_scenario()
+    except Exception:
+        pass
+    yield
+    try:
+        core.config.reset_scenario()
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 

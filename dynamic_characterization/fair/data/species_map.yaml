@@ -12,6 +12,10 @@ species:
   "non-methane volatile": "VOC"
   "carbon, in air": "CO2 AFOLU"
 # Precursor species -> FAIR forcing response channel.
+# NOTE: This mapping is informational/reserved metadata documenting which forcing
+# channel each precursor drives in FAIR. FAIR applies these responses natively when
+# the precursor emission species (NOx, VOC, Sulfur, etc.) is perturbed; this package
+# does not route them separately, so the precursor table is not used for calculations.
 precursors:
   "NOx": "Ozone"
   "VOC": "Ozone"
