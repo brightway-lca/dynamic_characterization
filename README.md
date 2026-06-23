@@ -214,61 +214,68 @@ Each row represents the characterization result for one (year, flow, activity, q
 
 ### Setting up a FAIR scenario
 
-FAIR metrics require a scenario to be set first (same `set_scenario` call as for prospective metrics):
+FAIR metrics require a scenario to be set first. FAIR runs against an SSP marker
+background that is not tied to any IAM, so FAIR-native scenarios are selected
+with `set_fair_scenario(ssp, rcp)`:
 
 ```python
 import dynamic_characterization.prospective as prospective
 
-# FAIR-native scenario (IAM-agnostic marker):
-prospective.set_scenario(iam="FAIR", ssp="SSP2", rcp="4.5")
-
-# Or a dual prospective+FAIR scenario (also supports pGWP etc.):
-prospective.set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
+# FAIR-native scenario (just an SSP marker, no IAM):
+prospective.set_fair_scenario("SSP2", "4.5")
 ```
 
-FAIR-native scenarios use `iam="FAIR"`. Dual scenarios (IAM-based) support both prospective and FAIR metrics.
+The four IAM scenarios that line up with an exact FAIR marker also support the
+FAIR metrics (and additionally the prospective metrics), and are still selected
+with `set_scenario`:
+
+```python
+# Dual prospective+FAIR scenario (also supports pGWP etc.):
+prospective.set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
+```
 
 If the current scenario does not support FAIR metrics (or if no scenario has been set), the metrics raise a clear `ValueError`.
 
 ### Available FAIR-capable scenarios
 
-Use `available_scenarios("fair")` to list FAIR-capable scenarios programmatically:
-
 ```python
-from dynamic_characterization.prospective import available_scenarios
+from dynamic_characterization.prospective import (
+    available_fair_scenarios, available_scenarios,
+)
 
-# Scenarios that support fair_radiative_forcing / fair_temperature:
+# FAIR-native (ssp, rcp) pairs for set_fair_scenario(...):
+available_fair_scenarios()
+
+# IAM scenarios that also support FAIR (settable via set_scenario):
 available_scenarios("fair")
 
 # Scenarios that support pGWP / pGTP / prospective_radiative_forcing:
 available_scenarios("prospective")
 ```
 
-The following scenarios currently support FAIR metrics (12 total: 8 FAIR-native markers + 4 dual prospective+FAIR scenarios):
+FAIR-native markers (use `set_fair_scenario(ssp, rcp)`):
 
-| IAM | SSP | RCP | Notes |
-|-----|-----|-----|-------|
-| FAIR | SSP1 | 1.9 | FAIR-native |
-| FAIR | SSP1 | 2.6 | FAIR-native |
-| FAIR | SSP2 | 4.5 | FAIR-native |
-| FAIR | SSP3 | 7.0 | FAIR-native |
-| FAIR | SSP4 | 3.4 | FAIR-native |
-| FAIR | SSP4 | 6.0 | FAIR-native |
-| FAIR | SSP5 | 3.4-over | FAIR-native |
-| FAIR | SSP5 | 8.5 | FAIR-native |
-| GCAM4 | SSP4 | 6.0 | dual (prospective + FAIR) |
-| IMAGE | SSP1 | 2.6 | dual (prospective + FAIR) |
-| MESSAGE | SSP2 | 4.5 | dual (prospective + FAIR) |
-| REMIND | SSP5 | 8.5 | dual (prospective + FAIR) |
+| SSP | RCP | FAIR marker |
+|-----|-----|-------------|
+| SSP1 | 1.9 | ssp119 |
+| SSP1 | 2.6 | ssp126 |
+| SSP2 | 4.5 | ssp245 |
+| SSP3 | 7.0 | ssp370 |
+| SSP4 | 3.4 | ssp434 |
+| SSP4 | 6.0 | ssp460 |
+| SSP5 | 3.4-over | ssp534-over |
+| SSP5 | 8.5 | ssp585 |
+
+Dual IAM scenarios that also support FAIR (use `set_scenario(iam, ssp, rcp)`): `GCAM4·SSP4·6.0`, `IMAGE·SSP1·2.6`, `MESSAGE·SSP2·4.5`, `REMIND·SSP5·8.5`.
 
 ### Running FAIR characterization
 
 ```python
 from dynamic_characterization import characterize
-from dynamic_characterization.prospective import set_scenario, available_scenarios
+from dynamic_characterization.prospective import set_fair_scenario
 
-# Pick a FAIR-capable scenario (see available_scenarios("fair"))
-set_scenario("FAIR", "SSP2", "4.5")
+# Pick a FAIR-native scenario (see available_fair_scenarios())
+set_fair_scenario("SSP2", "4.5")
 
 # Returns a long DataFrame with columns
 # ["date", "amount", "flow", "activity", "quantile"]

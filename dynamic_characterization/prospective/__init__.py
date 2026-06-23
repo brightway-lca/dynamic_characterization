@@ -10,14 +10,17 @@ Reference: https://doi.org/10.1021/acs.est.5b01118
 from . import agtp
 from . import agwp
 from .config import (
+    FAIR_NATIVE_SCENARIOS,
     VALID_SCENARIOS,
     SCENARIO_REGISTRY,
+    available_fair_scenarios,
     available_scenarios,
     current_fair_marker,
     get_scenario,
     metric_family,
     reset_scenario,
     scenario_supports,
+    set_fair_scenario,
     set_scenario,
 )
 from .data_loader import (
@@ -38,14 +41,17 @@ from .radiative_forcing import (
 __all__ = [
     "agtp",
     "agwp",
+    "FAIR_NATIVE_SCENARIOS",
     "VALID_SCENARIOS",
     "SCENARIO_REGISTRY",
+    "available_fair_scenarios",
     "available_scenarios",
     "current_fair_marker",
     "get_scenario",
     "metric_family",
     "reset_scenario",
     "scenario_supports",
+    "set_fair_scenario",
     "set_scenario",
     "load_irf_ch4",
     "load_irf_co2",

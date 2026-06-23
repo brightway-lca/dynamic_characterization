@@ -37,7 +37,7 @@ def test_fair_metric_under_prospective_only_scenario_raises():
 
 
 def test_fair_metric_dispatches_to_core(monkeypatch):
-    prospective.set_scenario("FAIR", "SSP2", "4.5")
+    prospective.set_fair_scenario("SSP2", "4.5")
     called = {}
 
     def fake(df, output="radiative_forcing", quantiles=(50.0,),

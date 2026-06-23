@@ -168,15 +168,18 @@ def characterize(
         except RuntimeError as exc:
             raise ValueError(
                 f"Metric {metric!r} requires a fair-capable scenario, but no "
-                f"scenario is set. Call set_scenario(iam, ssp, rcp) first. "
-                f"Fair-capable scenarios: "
-                f"{_prospective_config.available_scenarios('fair')}"
+                f"scenario is set. Call set_fair_scenario(ssp, rcp) with one of "
+                f"{_prospective_config.available_fair_scenarios()}, or a "
+                f"fair-capable IAM scenario via set_scenario from "
+                f"{_prospective_config.available_scenarios('fair')}."
             ) from exc
         if not supported:
             raise ValueError(
-                f"Metric {metric!r} requires a fair-capable scenario. "
-                f"Fair-capable scenarios: "
-                f"{_prospective_config.available_scenarios('fair')}"
+                f"Metric {metric!r} requires a fair-capable scenario. Use "
+                f"set_fair_scenario(ssp, rcp) with one of "
+                f"{_prospective_config.available_fair_scenarios()}, or a "
+                f"fair-capable IAM scenario via set_scenario from "
+                f"{_prospective_config.available_scenarios('fair')}."
             )
         enriched = _add_fair_flow_names(dynamic_inventory_df)
         from dynamic_characterization.fair.core import characterize_with_fair

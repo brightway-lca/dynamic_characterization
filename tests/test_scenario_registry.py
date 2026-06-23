@@ -36,13 +36,24 @@ def test_prospective_scenarios_count():
     assert len(config.available_scenarios("prospective")) == 18
 
 
-def test_fair_native_markers_present():
+def test_fair_native_scenarios_present():
+    fair_native = set(config.available_fair_scenarios())
+    assert ("SSP3", "7.0") in fair_native
+    assert ("SSP5", "3.4-over") in fair_native
+    assert len(fair_native) == 8
+
+
+def test_available_scenarios_fair_lists_only_dual_iam_scenarios():
     fair = set(config.available_scenarios("fair"))
-    assert ("FAIR", "SSP3", "7.0") in fair
-    assert ("FAIR", "SSP5", "3.4-over") in fair
-    # the 4 dual-support prospective scenarios are also fair-capable
-    assert ("IMAGE", "SSP1", "2.6") in fair
-    assert ("MESSAGE", "SSP2", "4.5") in fair
+    # the 4 dual-support IAM scenarios
+    assert fair == {
+        ("GCAM4", "SSP4", "6.0"),
+        ("IMAGE", "SSP1", "2.6"),
+        ("MESSAGE", "SSP2", "4.5"),
+        ("REMIND", "SSP5", "8.5"),
+    }
+    # FAIR-native entries are NOT in the IAM registry
+    assert ("FAIR", "SSP3", "7.0") not in fair
 
 
 def test_dual_support_scenario_metrics():
@@ -51,10 +62,17 @@ def test_dual_support_scenario_metrics():
     assert entry["fair_marker"] == "ssp126"
 
 
-def test_fair_native_is_fair_only():
-    entry = config.SCENARIO_REGISTRY[("FAIR", "SSP3", "7.0")]
-    assert entry["metrics"] == frozenset({"fair"})
-    assert entry["fair_marker"] == "ssp370"
+def test_set_fair_scenario_marker_and_support():
+    config.set_fair_scenario("SSP3", "7.0")
+    assert config.scenario_supports("fair") is True
+    assert config.scenario_supports("prospective") is False
+    assert config.current_fair_marker() == "ssp370"
+    assert config.get_scenario()["iam"] is None
+
+
+def test_set_fair_scenario_rejects_unknown():
+    with pytest.raises(ValueError, match="Invalid FAIR scenario"):
+        config.set_fair_scenario("SSP3", "4.5")  # not a FAIR marker
 
 
 def test_scenario_supports_and_marker():

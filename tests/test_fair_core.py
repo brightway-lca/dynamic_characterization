@@ -164,7 +164,7 @@ def test_characterize_with_fair_runs(monkeypatch):
     import dynamic_characterization.prospective.config as cfg  # noqa
 
     # use a fair-capable scenario
-    core.config.set_scenario("FAIR", "SSP2", "4.5")
+    core.config.set_fair_scenario("SSP2", "4.5")
     out = core.characterize_with_fair(
         _inv(), output="radiative_forcing", quantiles=(50.0,)
     )
