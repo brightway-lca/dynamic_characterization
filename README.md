@@ -186,6 +186,15 @@ Install the optional dependency with:
 $ pip install dynamic_characterization[fair]
 ```
 
+> **Calibration data:** FAIR's uncertainty comes from the calibrated,
+> constrained AR6 ensemble (`calibration1.4.1`, 841 members), which is **not**
+> bundled in the `fair` package. If the calibration CSVs are not found in your
+> `fair` install, they are downloaded from the FaIR example data and cached
+> locally (via `pooch`) on the first FAIR run, so the **first** call needs
+> network access. FAIR is simulated from 1750 to spin up the climate state;
+> your inventory is applied as a perturbation on top of the chosen SSP marker
+> background.
+
 ### FAIR metrics
 
 Two metrics are available:

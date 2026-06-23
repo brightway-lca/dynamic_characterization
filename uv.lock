@@ -1219,6 +1219,7 @@ dev = [
 ]
 fair = [
     { name = "fair" },
+    { name = "pooch" },
 ]
 testing = [
     { name = "pytest", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -1240,12 +1241,13 @@ demo = [
 requires-dist = [
     { name = "build", marker = "extra == 'dev'" },
     { name = "bw2data" },
-    { name = "fair", marker = "extra == 'fair'", specifier = ">=2.1" },
+    { name = "fair", marker = "extra == 'fair'", specifier = ">=2.2" },
     { name = "loguru" },
     { name = "matplotlib", specifier = ">=3.9.4" },
     { name = "numpy" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas" },
+    { name = "pooch", marker = "extra == 'fair'" },
     { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "pylint", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'dev'" },

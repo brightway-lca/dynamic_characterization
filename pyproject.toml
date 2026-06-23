@@ -61,7 +61,7 @@ dev = [
     "pytest-randomly",
     "setuptools",
 ]
-fair = ["fair>=2.1"]
+fair = ["fair>=2.2", "pooch"]
 
 [tool.setuptools]
 license-files = ["LICENSE"]
