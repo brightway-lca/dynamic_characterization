@@ -23,12 +23,41 @@ from dynamic_characterization.ipcc_ar6.radiative_forcing import (
     create_generic_characterization_function,
 )
 from dynamic_characterization.prospective import agwp, agtp
+from dynamic_characterization.prospective import config as _prospective_config
 from dynamic_characterization.prospective.radiative_forcing import (
     characterize_ch4 as prospective_characterize_ch4,
     characterize_co2 as prospective_characterize_co2,
     characterize_co2_uptake as prospective_characterize_co2_uptake,
     characterize_n2o as prospective_characterize_n2o,
 )
+
+
+def _add_fair_flow_names(dynamic_inventory_df):
+    """Best-effort: add a 'flow_name' column mapping biosphere flow ids to names.
+
+    Looks up names from the biosphere database. Never raises: if the project /
+    biosphere / a node is unavailable, the (possibly partial) frame is returned
+    unchanged so the FAIR path degrades gracefully (logs at debug level) instead of
+    crashing. If a 'flow_name' column already exists it is left untouched.
+    """
+    if "flow_name" in dynamic_inventory_df.columns:
+        return dynamic_inventory_df
+    try:
+        biosphere_db = bd.Database(bd.config.biosphere)
+        names = {}
+        for fid in dynamic_inventory_df["flow"].unique():
+            try:
+                names[fid] = biosphere_db.get(id=fid)["name"]
+            except Exception:
+                continue
+        if not names:
+            return dynamic_inventory_df
+        return dynamic_inventory_df.assign(
+            flow_name=dynamic_inventory_df["flow"].map(names)
+        )
+    except Exception as exc:
+        logger.debug("Could not enrich inventory with flow names: {}", exc)
+        return dynamic_inventory_df
 
 
 # Building the default characterization functions reloads decay_multipliers.json and
@@ -82,6 +111,8 @@ def characterize(
         - "pGWP": Returns kg CO2eq using Watanabe et al. (2026) prospective GWP (requires scenario)
         - "pGTP": Returns kg CO2eq using Watanabe et al. (2026) prospective GTP (requires scenario)
         - "prospective_radiative_forcing": Returns W/m2 time series using Watanabe et al. (2026) functions (requires scenario)
+        - "fair_radiative_forcing": Returns ΔRF [W/m2] time series per quantile using FAIR model (requires a fair-capable scenario set via ``set_scenario()``, returns a DataFrame with an extra ``quantile`` column; needs ``pip install dynamic_characterization[fair]``)
+        - "fair_temperature": Returns ΔT [K] time series per quantile using FAIR model (requires a fair-capable scenario set via ``set_scenario()``, returns a DataFrame with an extra ``quantile`` column; needs ``pip install dynamic_characterization[fair]``)
     characterization_functions : dict, optional
         A dictionary of the form {biosphere_flow_id: dynamic_characterization_function} allowing users to specify their own functions and what flows to apply them to.
         Default is none, in which case a set of default functions are added based on the base_lcia_method.
@@ -113,10 +144,47 @@ def characterize(
         characterized dynamic inventory
     """
 
-    valid_metrics = {"radiative_forcing", "GWP", "pGWP", "pGTP", "prospective_radiative_forcing"}
+    valid_metrics = {
+        "radiative_forcing",
+        "GWP",
+        "pGWP",
+        "pGTP",
+        "prospective_radiative_forcing",
+        "fair_radiative_forcing",
+        "fair_temperature",
+    }
     if metric not in valid_metrics:
         raise ValueError(
             f"Metric must be one of {valid_metrics}, not {metric}"
+        )
+
+    fair_outputs = {
+        "fair_radiative_forcing": "radiative_forcing",
+        "fair_temperature": "temperature",
+    }
+    if metric in fair_outputs:
+        try:
+            supported = _prospective_config.scenario_supports("fair")
+        except RuntimeError as exc:
+            raise ValueError(
+                f"Metric {metric!r} requires a fair-capable scenario, but no "
+                f"scenario is set. Call set_scenario(iam, ssp, rcp) first. "
+                f"Fair-capable scenarios: "
+                f"{_prospective_config.available_scenarios('fair')}"
+            ) from exc
+        if not supported:
+            raise ValueError(
+                f"Metric {metric!r} requires a fair-capable scenario. "
+                f"Fair-capable scenarios: "
+                f"{_prospective_config.available_scenarios('fair')}"
+            )
+        enriched = _add_fair_flow_names(dynamic_inventory_df)
+        from dynamic_characterization.fair.core import characterize_with_fair
+
+        return characterize_with_fair(
+            enriched,
+            output=fair_outputs[metric],
+            time_horizon=time_horizon,
         )
 
     # For prospective metrics, use Watanabe characterization functions

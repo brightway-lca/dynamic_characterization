@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+* Add optional FAIR climate-model path with `fair_radiative_forcing` (ΔRF, W/m²) and `fair_temperature` (ΔT, K) metrics
+* FAIR metrics return probabilistic ensemble results with per-flow/activity attribution and configurable quantiles (default: 2.5, 25, 50, 75, 97.5 percentiles)
+* Superset scenario registry now covers 12 FAIR-capable scenarios (8 FAIR-native SSP markers + 4 dual prospective+FAIR scenarios)
+* Add `available_scenarios(metric)` to programmatically list scenarios supporting a given metric or metric family (`"fair"`, `"prospective"`, `"pGWP"`, etc.)
+* FAIR runs use the calibrated, constrained AR6 ensemble (`calibration1.4.1`, 841 members); the calibration data is downloaded and cached (via `pooch`) on first use when not vendored in the `fair` install (verified against `fair` 2.2.4)
 
 ## [1.4.0] - (2026-05-17)
 * Add caching
