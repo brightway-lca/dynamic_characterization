@@ -457,21 +457,26 @@ def create_characterization_functions_from_method(
 
     for node in bioflow_nodes:
         if "carbon dioxide" in node["name"].lower():
-            if "soil" in node.get("categories", []) and characterize_uptake:
-                characterization_functions[node.id] = (
-                    co2_uptake_func  # negative emission because uptake by soil
-                )
-            elif (
-                "in air" in node.get("categories", [])
-                and node.get("type", []) == "natural resource"
-                and characterize_uptake
-            ):
-                # CO2 as a natural resource in air is assumed to be used for uptake in biomass or CDR processes
-                characterization_functions[node.id] = (
-                    co2_uptake_func   # negative emission because uptake by biomass or CDR processes
-                )
-            # explicitely exlude CO2 flow that are a natural resource, as these are uptake flows
-            elif "in air" in node.get("categories", []) and not "natural resource" in node.get("type", []):
+            categories = node.get("categories") or ()
+            # uptake by soil, i.e. CO2 leaving the technosphere towards the soil compartment.
+            # Only the categories are checked, so that emissions to air from flows like
+            # "Carbon dioxide, from soil or biomass stock" are not misread as uptake.
+            is_soil_uptake = "soil" in categories
+            # CO2 as a natural resource in air is assumed to be used for uptake in biomass
+            # or CDR processes
+            is_uptake_resource = (
+                "in air" in categories and node.get("type") == "natural resource"
+            )
+
+            if is_soil_uptake or is_uptake_resource:
+                if characterize_uptake:
+                    characterization_functions[node.id] = (
+                        co2_uptake_func  # negative emission because of uptake
+                    )
+                # else: uptake is modelled outside of the dynamic characterization,
+                # so these flows are intentionally left uncharacterized
+            else:
+                # all remaining CO2 flows are emissions, regardless of the air subcategory
                 characterization_functions[node.id] = co2_func
 
         elif (
