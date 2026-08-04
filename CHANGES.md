@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+* Add optional FAIR climate-model path with `fair_radiative_forcing` (ΔRF, W/m²) and `fair_temperature` (ΔT, K) metrics
+* FAIR metrics return probabilistic ensemble results with per-flow/activity attribution and configurable quantiles (default: 2.5, 25, 50, 75, 97.5 percentiles)
+* Select a FAIR-native SSP background with `set_fair_scenario(ssp, rcp)` (8 markers, IAM-agnostic); the 4 IAM scenarios that match a FAIR marker also support FAIR via `set_scenario`
+* Add `available_fair_scenarios()` and `available_scenarios(metric)` to programmatically list scenarios supporting a given metric or metric family (`"fair"`, `"prospective"`, `"pGWP"`, etc.)
+* FAIR runs use the calibrated, constrained AR6 ensemble (`calibration1.4.1`, 841 members); the calibration data is downloaded and cached (via `pooch`) on first use when not vendored in the `fair` install (verified against `fair` 2.2.4)
 
 ## [1.4.1] - (2026-08-03)
 * Fixed a regression introduced in 1.4.0 where ordinary CO2 emission flows (e.g. `Carbon dioxide, fossil` emitted to any air subcategory) got no default characterization function and were silently skipped, understating dynamic climate scores by roughly an order of magnitude. `characterize_uptake=False` now only suppresses the uptake functions instead of all CO2 characterization.
