@@ -33,6 +33,26 @@ VALID_SCENARIOS: Set[Tuple[str, str, str]] = {
 # Module-level state
 _current_scenario: Optional[Dict[str, str]] = None
 
+# Raised when a prospective characterization factor is requested before a scenario is
+# chosen. This is often the first time users see this package: the prospective metrics
+# are usually calculated through another package (e.g. bw_timex), so the message spells
+# out the full import path and does not assume anything is imported already.
+NO_SCENARIO_MESSAGE = """No scenario set.
+
+The prospective characterization factors (Watanabe et al. 2026) used for the metrics
+"pGWP", "pGTP" and "prospective_radiative_forcing" depend on a future scenario, so you
+have to choose one before calculating them - also if you calculate them through another
+package, such as bw_timex:
+
+    from dynamic_characterization.prospective import set_scenario
+    set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
+
+This is done once per Python session and applies to all following calculations.
+
+Each IAM comes with one SSP: IMAGE-SSP1, MESSAGE-SSP2, AIM-SSP3, GCAM4-SSP4,
+REMIND-SSP5. The available RCPs are "2.6", "4.5", "6.0" and "8.5", but not for every
+IAM - see dynamic_characterization.prospective.VALID_SCENARIOS for the full list."""
+
 
 def set_scenario(iam: str, ssp: str, rcp: str) -> None:
     """
@@ -79,9 +99,7 @@ def get_scenario() -> Dict[str, str]:
         If no scenario has been set
     """
     if _current_scenario is None:
-        raise RuntimeError(
-            "No scenario set. Call prospective.set_scenario(iam, ssp, rcp) first."
-        )
+        raise RuntimeError(NO_SCENARIO_MESSAGE)
     return _current_scenario.copy()
 
 
