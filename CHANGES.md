@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+* Fixed `TypeError: ... got an unexpected keyword argument 'time_varying_re'` for the `pGWP` and `pGTP` metrics: `time_varying_re` was passed to every characterization function, including the IPCC AR6 fallback functions (CO and the GHGs from `decay_multipliers.json`), which don't accept it.
 
 ## [1.4.1] - (2026-08-03)
 * Fixed a regression introduced in 1.4.0 where ordinary CO2 emission flows (e.g. `Carbon dioxide, fossil` emitted to any air subcategory) got no default characterization function and were silently skipped, understating dynamic climate scores by roughly an order of magnitude. `characterize_uptake=False` now only suppresses the uptake functions instead of all CO2 characterization.
