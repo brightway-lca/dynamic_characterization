@@ -41,8 +41,7 @@ NO_SCENARIO_MESSAGE = """No scenario set.
 
 The prospective characterization factors (Watanabe et al. 2026) used for the metrics
 "pGWP", "pGTP" and "prospective_radiative_forcing" depend on a future scenario, so you
-have to choose one before calculating them - also if you calculate them through another
-package, such as bw_timex:
+have to choose one before calculating them:
 
     from dynamic_characterization.prospective import set_scenario
     set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
