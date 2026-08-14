@@ -31,6 +31,15 @@ from dynamic_characterization.prospective.radiative_forcing import (
 )
 
 
+# Characterization functions from the Watanabe module. These are the only ones that
+# accept the `time_varying_re` argument.
+_PROSPECTIVE_CHARACTERIZATION_FUNCTIONS = (
+    prospective_characterize_co2,
+    prospective_characterize_co2_uptake,
+    prospective_characterize_ch4,
+    prospective_characterize_n2o,
+)
+
 # Building the default characterization functions reloads decay_multipliers.json and
 # issues one biosphere DB query per method flow. The result only depends on the BW
 # project, the method, and the boolean flags, so it is memoized across calls.
@@ -548,6 +557,24 @@ def _calculate_dynamic_time_horizon(
         return time_horizon
 
 
+def _apply_characterization_function(
+    char_func,
+    row,
+    time_horizon,
+    time_varying_re: bool = False,
+) -> CharacterizedRow:
+    """
+    Call a characterization function, passing `time_varying_re` only to those that accept it.
+
+    Flows that are not covered by the Watanabe module (e.g. CO and the GHGs from
+    decay_multipliers.json) are characterized with IPCC AR6 functions, which have no
+    `time_varying_re` parameter.
+    """
+    if char_func in _PROSPECTIVE_CHARACTERIZATION_FUNCTIONS:
+        return char_func(row, time_horizon, time_varying_re=time_varying_re)
+    return char_func(row, time_horizon)
+
+
 def _characterize_radiative_forcing(
     characterization_functions, row, time_horizon
 ) -> CharacterizedRow:
@@ -601,7 +628,8 @@ def _characterize_pgwp(
     emission_year = int(str(emission_date.to_numpy())[:4])
 
     # Calculate AGWP for the gas using its characterization function
-    radiative_forcing_ghg = characterization_functions[row.flow](
+    radiative_forcing_ghg = _apply_characterization_function(
+        characterization_functions[row.flow],
         row,
         dynamic_time_horizon,
         time_varying_re=time_varying_re,
@@ -673,9 +701,11 @@ def _characterize_pgtp(
     else:
         # For other GHGs, fall back to using integrated RF as proxy
         # This may not be as accurate but provides a fallback
-        radiative_forcing_ghg = char_func(
+        radiative_forcing_ghg = _apply_characterization_function(
+            char_func,
             row,
             dynamic_time_horizon,
+            time_varying_re=time_varying_re,
         )
         agtp_gas = radiative_forcing_ghg.amount.sum()
 
@@ -708,19 +738,9 @@ def _characterize_prospective_radiative_forcing(
     For GHGs available in Watanabe (CO2, CH4, N2O), uses scenario-based radiative efficiencies.
     For other GHGs (when fallback_to_ipcc=True), uses standard IPCC AR6 functions.
     """
-    char_func = characterization_functions[row.flow]
-
-    # Check if this is a Watanabe function (they accept time_varying_re parameter)
-    prospective_functions = (
-        prospective_characterize_co2,
-        prospective_characterize_co2_uptake,
-        prospective_characterize_ch4,
-        prospective_characterize_n2o,
+    return _apply_characterization_function(
+        characterization_functions[row.flow],
+        row,
+        time_horizon,
+        time_varying_re=time_varying_re,
     )
-
-    if char_func in prospective_functions:
-        # Watanabe functions support time_varying_re
-        return char_func(row, time_horizon, time_varying_re=time_varying_re)
-    else:
-        # IPCC fallback functions don't support time_varying_re
-        return char_func(row, time_horizon)
