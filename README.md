@@ -204,17 +204,35 @@ def example_characterization_function(series: namedtuple, period: int = 2) -> na
 
 ## Installation
 
-You can install `dynamic_characterization` via [pip] from [PyPI]:
+We recommend [uv](https://docs.astral.sh/uv/), a fast, modern Python package manager. Installing uv itself is a [one-liner](https://docs.astral.sh/uv/getting-started/installation/#standalone-installer).
+
+In a new project:
 
 ```console
-$ pip install dynamic_characterization
+$ uv init my-dynchar-project
+$ cd my-dynchar-project
+$ uv add dynamic-characterization
 ```
 
-Alternatively, you can also use conda:
+Or into an existing (activated) environment:
 
 ```console
-$ conda install -c diepers dynamic_characterization
+$ uv pip install dynamic-characterization
 ```
+
+Alternatively, with `pip` from [PyPI]:
+
+```console
+$ pip install dynamic-characterization
+```
+
+or with conda:
+
+```console
+$ conda install -c conda-forge -c diepers dynamic_characterization
+```
+
+See the [installation guide](https://dynamic-characterization.readthedocs.io/en/latest/content/installation/) for details.
 
 ## Contributing
 
@@ -237,7 +255,7 @@ If you have any questions or need help, do not hesitate to contact Timo Diepers 
 
 <!-- github-only -->
 
-[command-line reference]: https://dynamic-characterization.readthedocs.io/en/latest/usage.html
-[License]: https://github.com/TimoDiepers/dynamic_characterization/blob/main/LICENSE
-[Contributor Guide]: https://github.com/TimoDiepers/dynamic_characterization/blob/main/CONTRIBUTING.md
-[Issue Tracker]: https://github.com/TimoDiepers/dynamic_characterization/issues
+[command-line reference]: https://dynamic-characterization.readthedocs.io/en/latest/content/usage/
+[License]: https://github.com/brightway-lca/dynamic_characterization/blob/main/LICENSE
+[Contributor Guide]: https://github.com/brightway-lca/dynamic_characterization/blob/main/CONTRIBUTING.md
+[Issue Tracker]: https://github.com/brightway-lca/dynamic_characterization/issues

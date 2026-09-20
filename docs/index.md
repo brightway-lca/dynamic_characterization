@@ -1,14 +1,14 @@
-# dynamic_characterization
+# Time-resolved Life Cycle Impact Assessment with `dynamic_characterization`
 
 This is a package for the dynamic characterization of Life Cycle Inventories with temporal information. It includes a collection of dynamic characterization functions for various environmental flows. We also provide a simple interface to apply these functions to an existing dynamic LCI (coming from, e.g., [bw_temporalis](https://github.com/brightway-lca/bw_temporalis) or [bw_timex](https://github.com/brightway-lca/bw_timex)).
 
 The following dynamic characterization functions are currently included:
 
-| module |impact category | metric | covered emissions | source
-|--------|-------|----------|----------|--|
-| ipcc_ar6 | climate change | radiative forcing, GWP | 247 GHGs | radiative efficiencies & lifetimes from [IPCC AR6 Ch.7](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/) |
-| prospective | climate change | pGWP, pGTP | CO2, CH4, N2O | prospective characterization factors from [Watanabe et al. (2026)](https://doi.org/10.1021/acs.est.5b01118) |
-| original_temporalis_functions| climate change | radiative forcing | CO2, CH4 |[bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main)|
+| module | impact category | metric | covered emissions | source |
+|--------|-----------------|--------|-------------------|--------|
+| [`ipcc_ar6`](api/ipcc_ar6.md) | climate change | radiative forcing, GWP | 247 GHGs | radiative efficiencies & lifetimes from [IPCC AR6 Ch.7](https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/) |
+| [`prospective`](content/prospective.md) | climate change | prospective radiative forcing, pGWP, pGTP | CO2, CH4, N2O | prospective characterization factors from [Watanabe et al. (2026)](https://pubs.acs.org/doi/10.1021/acs.est.5c12391) |
+| [`original_temporalis_functions`](api/original_temporalis_functions.md) | climate change | radiative forcing | CO2, CH4 | [bw_temporalis](https://github.com/brightway-lca/bw_temporalis/tree/main) |
 
 ## What do dynamic characterization functions do?
 
@@ -29,7 +29,6 @@ Each function takes one row of this dynamic inventory dataframe (i.e. one emissi
 | 312  | 21     | 4    | 2        |
 | 313  | 20     | 4    | 2        |
 | 314  | 19     | 4    | 2        |
-
 
 ## What do dynamic characterization functions look like?
 
@@ -57,20 +56,14 @@ def example_characterization_function(series: namedtuple, period: int = 2) -> na
     )
 ```
 
-## Support
+## 👩‍💻 Getting Started
+
+- [Installation](content/installation.md) — `uv`, `pip` or `conda`
+- [Usage](content/usage.md) — the basic workflow, and the metrics you can ask for
+- [Prospective Characterization](content/prospective.md) — scenario-based characterization factors
+- [Examples](content/examples/index.md) — rendered demo notebooks
+- [API Reference](api/index.md)
+
+## 💬 Support
 
 If you have any questions or need help, do not hesitate to contact Timo Diepers ([timo.diepers@ltt.rwth-aachen.de](mailto:timo.diepers@ltt.rwth-aachen.de))
-
-```{toctree}
----
-hidden:
-maxdepth: 1
----
-content/usage
-Prospective Characterization <content/prospective>
-content/api/index
-Code of Conduct <content/codeofconduct>
-Contributing <content/contributing>
-content/license
-Changelog <content/changelog>
-```
