@@ -1367,6 +1367,9 @@ testing = [
     { name = "pytest-cov" },
     { name = "python-coveralls" },
 ]
+timex = [
+    { name = "bw-timex", marker = "python_full_version >= '3.11'" },
+]
 
 [package.dev-dependencies]
 demo = [
@@ -1377,15 +1380,11 @@ demo = [
     { name = "ipykernel", version = "6.31.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "ipykernel", version = "7.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
 ]
-timex = [
-    { name = "bw-timex", marker = "python_full_version >= '3.11'" },
-    { name = "ipykernel", version = "6.31.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "ipykernel", version = "7.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-]
 
 [package.metadata]
 requires-dist = [
     { name = "build", marker = "extra == 'dev'" },
+    { name = "bw-timex", marker = "python_full_version >= '3.11' and extra == 'timex'", specifier = ">=1.4" },
     { name = "bw2data" },
     { name = "fair", marker = "extra == 'fair'", specifier = ">=2.2" },
     { name = "loguru" },
@@ -1405,17 +1404,13 @@ requires-dist = [
     { name = "pyyaml" },
     { name = "setuptools", marker = "extra == 'dev'" },
 ]
-provides-extras = ["testing", "dev", "fair"]
+provides-extras = ["testing", "dev", "fair", "timex"]
 
 [package.metadata.requires-dev]
 demo = [
     { name = "bw-temporalis", specifier = ">=1.2.0" },
     { name = "bw2data", specifier = ">=4.5.4" },
     { name = "bw2io", specifier = ">=0.9.14" },
-    { name = "ipykernel", specifier = ">=6.31.0" },
-]
-timex = [
-    { name = "bw-timex", marker = "python_full_version >= '3.11'", specifier = ">=1.4" },
     { name = "ipykernel", specifier = ">=6.31.0" },
 ]
 
