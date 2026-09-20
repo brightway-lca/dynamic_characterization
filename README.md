@@ -19,10 +19,10 @@ The following dynamic characterization functions are currently included:
 ## Installation
 
 ```console
-$ uv add dynamic-characterization
+$ pip install dynamic-characterization
 ```
 
-Also available via `pip install dynamic-characterization` and `conda install -c conda-forge -c diepers dynamic_characterization`. See the [installation guide](https://dynamic-characterization.readthedocs.io/en/latest/content/installation/) for the details.
+The same thing with [uv](https://docs.astral.sh/uv/) is `uv add dynamic-characterization`, and with conda `conda install -c conda-forge -c diepers dynamic_characterization`. See the [installation guide](https://dynamic-characterization.readthedocs.io/en/latest/content/installation/) for the details.
 
 ## Quick start
 
