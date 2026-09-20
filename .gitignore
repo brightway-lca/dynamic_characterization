@@ -26,7 +26,6 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-conda
 conda-out
 
 # PyInstaller
@@ -132,3 +131,6 @@ dmypy.json
 .pyre/
 
 .DS_Store
+
+# Generated from notebooks/ by docs/convert_notebooks.py
+/docs/content/examples/demos/

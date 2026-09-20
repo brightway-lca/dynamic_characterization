@@ -1,3 +1,10 @@
+---
+icon: lucide/footprints
+tags:
+  - usage
+  - dynamic characterization
+---
+
 # Usage
 
 The workflow to use this package could look like this:

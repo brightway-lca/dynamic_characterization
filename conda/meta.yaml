@@ -1,0 +1,81 @@
+{% set data = load_file_regex(load_file="../dynamic_characterization/__init__.py", regex_pattern='__version__ = "(.+)"', from_recipe_dir=True) %}
+{% set version = data.group(1) %}
+
+{% set pyproject = load_file_data("../pyproject.toml", from_recipe_dir=True) %}
+{% set requires_python = pyproject["project"]["requires-python"] %}
+
+{# Run requirements are generated from pyproject.toml so the conda package and
+   the wheel can never disagree - `pip check` in the test section below fails
+   when they do. Only names that differ on conda-forge need an entry here. #}
+{% set conda_names = {"matplotlib": "matplotlib-base"} %}
+
+{# Packages whose version constraint is dropped on conda because conda has no
+   build new enough to satisfy it. Nothing needs this today; keep the list so
+   the reason is written down the next time something does. #}
+{% set unpinned_on_conda = [] %}
+
+{# PEP 508 environment markers (e.g. `; python_version >= "3.11"`) aren't valid
+   conda MatchSpecs, and conda selectors don't work per-consumer on a noarch
+   package (they're baked in at build time on one machine), so dependencies
+   carrying one are dropped. Optional extras are not part of the conda package
+   either way. #}
+
+package:
+  name: dynamic_characterization
+  version: {{ version }}
+
+source:
+  # Builds the code in this working tree. Bump dynamic_characterization/__init__.py before building.
+  path: ..
+
+build:
+  noarch: python
+  number: 0
+  script: {{ PYTHON }} -m pip install . --no-deps --no-build-isolation -vv
+
+requirements:
+  host:
+    - python {{ requires_python }}
+    - pip
+    - setuptools >=68
+  run:
+    - python {{ requires_python }}
+{% for dep in pyproject["project"]["dependencies"] %}
+{%- if ";" not in dep %}
+{#- conda wants a space between name and constraint, PEP 508 does not #}
+{%- set spec = dep | replace(">=", " >=") | replace("<=", " <=") | replace("==", " ==") | replace("!=", " !=") | replace("~=", " ~=") %}
+{%- set name = spec.split(" ")[0] %}
+    - {{ conda_names.get(name, name) }} {{ "" if name in unpinned_on_conda else spec.split(" ")[1:] | join(" ") }}
+{%- endif %}
+{%- endfor %}
+
+test:
+  imports:
+    - dynamic_characterization
+    - dynamic_characterization.ipcc_ar6
+    - dynamic_characterization.prospective
+  requires:
+    - pip
+  commands:
+    # `pip check` reads the wheel metadata, which keeps the PyPI constraints -
+    # so anything in `unpinned_on_conda` above would trip it by design. That
+    # list is empty, so this is expected to pass.
+    - pip check
+
+about:
+  home: https://github.com/brightway-lca/dynamic_characterization
+  summary: Collection of functions for characterizing life cycle inventories with temporal information
+  description: |
+    dynamic_characterization characterizes life cycle inventories that carry
+    temporal information. It bundles dynamic characterization functions for
+    various environmental flows - IPCC AR6 radiative forcing and GWP, and
+    prospective, scenario-based characterization factors - and a simple
+    interface for applying them to an existing dynamic LCI.
+  license: BSD-3-Clause
+  license_file: ../LICENSE
+  doc_url: https://dynamic-characterization.readthedocs.io
+  dev_url: https://github.com/brightway-lca/dynamic_characterization
+
+extra:
+  recipe-maintainers:
+    - TimoDiepers
