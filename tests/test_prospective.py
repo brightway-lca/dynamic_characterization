@@ -130,6 +130,24 @@ def test_get_scenario_without_set():
         config.get_scenario()
 
 
+def test_get_scenario_without_set_message_is_actionable():
+    """The error has to be usable by someone who only knows the calling package."""
+    with pytest.raises(RuntimeError) as excinfo:
+        config.get_scenario()
+
+    message = str(excinfo.value)
+
+    # A copy-pasteable fix, with the full import path: users reaching this via
+    # bw_timex have never imported dynamic_characterization themselves.
+    assert "from dynamic_characterization.prospective import set_scenario" in message
+    assert 'set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")' in message
+
+    # Which calculations need it, and which scenarios exist.
+    assert "pGWP" in message
+    assert "IMAGE-SSP1" in message
+    assert "REMIND-SSP5" in message
+
+
 def test_reset_scenario():
     """Reset should clear the current scenario."""
     config.set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")

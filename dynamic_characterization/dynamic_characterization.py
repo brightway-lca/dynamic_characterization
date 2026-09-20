@@ -67,6 +67,15 @@ def _add_fair_flow_names(dynamic_inventory_df):
         return dynamic_inventory_df
 
 
+# Characterization functions from the Watanabe module. These are the only ones that
+# accept the `time_varying_re` argument.
+_PROSPECTIVE_CHARACTERIZATION_FUNCTIONS = (
+    prospective_characterize_co2,
+    prospective_characterize_co2_uptake,
+    prospective_characterize_ch4,
+    prospective_characterize_n2o,
+)
+
 # Building the default characterization functions reloads decay_multipliers.json and
 # issues one biosphere DB query per method flow. The result only depends on the BW
 # project, the method, and the boolean flags, so it is memoized across calls.
@@ -535,21 +544,26 @@ def create_characterization_functions_from_method(
 
     for node in bioflow_nodes:
         if "carbon dioxide" in node["name"].lower():
-            if "soil" in node.get("categories", []) and characterize_uptake:
-                characterization_functions[node.id] = (
-                    co2_uptake_func  # negative emission because uptake by soil
-                )
-            elif (
-                "in air" in node.get("categories", [])
-                and node.get("type", []) == "natural resource"
-                and characterize_uptake
-            ):
-                # CO2 as a natural resource in air is assumed to be used for uptake in biomass or CDR processes
-                characterization_functions[node.id] = (
-                    co2_uptake_func   # negative emission because uptake by biomass or CDR processes
-                )
-            # explicitely exlude CO2 flow that are a natural resource, as these are uptake flows
-            elif "in air" in node.get("categories", []) and not "natural resource" in node.get("type", []):
+            categories = node.get("categories") or ()
+            # uptake by soil, i.e. CO2 leaving the technosphere towards the soil compartment.
+            # Only the categories are checked, so that emissions to air from flows like
+            # "Carbon dioxide, from soil or biomass stock" are not misread as uptake.
+            is_soil_uptake = "soil" in categories
+            # CO2 as a natural resource in air is assumed to be used for uptake in biomass
+            # or CDR processes
+            is_uptake_resource = (
+                "in air" in categories and node.get("type") == "natural resource"
+            )
+
+            if is_soil_uptake or is_uptake_resource:
+                if characterize_uptake:
+                    characterization_functions[node.id] = (
+                        co2_uptake_func  # negative emission because of uptake
+                    )
+                # else: uptake is modelled outside of the dynamic characterization,
+                # so these flows are intentionally left uncharacterized
+            else:
+                # all remaining CO2 flows are emissions, regardless of the air subcategory
                 characterization_functions[node.id] = co2_func
 
         elif (
@@ -621,6 +635,24 @@ def _calculate_dynamic_time_horizon(
         return time_horizon
 
 
+def _apply_characterization_function(
+    char_func,
+    row,
+    time_horizon,
+    time_varying_re: bool = False,
+) -> CharacterizedRow:
+    """
+    Call a characterization function, passing `time_varying_re` only to those that accept it.
+
+    Flows that are not covered by the Watanabe module (e.g. CO and the GHGs from
+    decay_multipliers.json) are characterized with IPCC AR6 functions, which have no
+    `time_varying_re` parameter.
+    """
+    if char_func in _PROSPECTIVE_CHARACTERIZATION_FUNCTIONS:
+        return char_func(row, time_horizon, time_varying_re=time_varying_re)
+    return char_func(row, time_horizon)
+
+
 def _characterize_radiative_forcing(
     characterization_functions, row, time_horizon
 ) -> CharacterizedRow:
@@ -674,7 +706,8 @@ def _characterize_pgwp(
     emission_year = int(str(emission_date.to_numpy())[:4])
 
     # Calculate AGWP for the gas using its characterization function
-    radiative_forcing_ghg = characterization_functions[row.flow](
+    radiative_forcing_ghg = _apply_characterization_function(
+        characterization_functions[row.flow],
         row,
         dynamic_time_horizon,
         time_varying_re=time_varying_re,
@@ -746,9 +779,11 @@ def _characterize_pgtp(
     else:
         # For other GHGs, fall back to using integrated RF as proxy
         # This may not be as accurate but provides a fallback
-        radiative_forcing_ghg = char_func(
+        radiative_forcing_ghg = _apply_characterization_function(
+            char_func,
             row,
             dynamic_time_horizon,
+            time_varying_re=time_varying_re,
         )
         agtp_gas = radiative_forcing_ghg.amount.sum()
 
@@ -781,19 +816,9 @@ def _characterize_prospective_radiative_forcing(
     For GHGs available in Watanabe (CO2, CH4, N2O), uses scenario-based radiative efficiencies.
     For other GHGs (when fallback_to_ipcc=True), uses standard IPCC AR6 functions.
     """
-    char_func = characterization_functions[row.flow]
-
-    # Check if this is a Watanabe function (they accept time_varying_re parameter)
-    prospective_functions = (
-        prospective_characterize_co2,
-        prospective_characterize_co2_uptake,
-        prospective_characterize_ch4,
-        prospective_characterize_n2o,
+    return _apply_characterization_function(
+        characterization_functions[row.flow],
+        row,
+        time_horizon,
+        time_varying_re=time_varying_re,
     )
-
-    if char_func in prospective_functions:
-        # Watanabe functions support time_varying_re
-        return char_func(row, time_horizon, time_varying_re=time_varying_re)
-    else:
-        # IPCC fallback functions don't support time_varying_re
-        return char_func(row, time_horizon)

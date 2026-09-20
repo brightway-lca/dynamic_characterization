@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Convert flows reported on a different mass basis than FAIR expects (nitric oxide to NO2, sulfur trioxide to SO2)
 * Log the flows that no FAIR species covers, so silent under-coverage is visible
 
+## [1.4.2] - (2026-08-14)
+* The error raised when a prospective metric is calculated without a scenario now explains what to do: full import path, a copy-pasteable `set_scenario` call, and the available IAM-SSP-RCP combinations.
+* Fixed `TypeError: ... got an unexpected keyword argument 'time_varying_re'` for the `pGWP` and `pGTP` metrics: `time_varying_re` was passed to every characterization function, including the IPCC AR6 fallback functions (CO and the GHGs from `decay_multipliers.json`), which don't accept it.
+
+## [1.4.1] - (2026-08-03)
+* Fixed a regression introduced in 1.4.0 where ordinary CO2 emission flows (e.g. `Carbon dioxide, fossil` emitted to any air subcategory) got no default characterization function and were silently skipped, understating dynamic climate scores by roughly an order of magnitude. `characterize_uptake=False` now only suppresses the uptake functions instead of all CO2 characterization.
+
 ## [1.4.0] - (2026-05-17)
 * Add caching
 * Vectorize radiative forcing calculations
