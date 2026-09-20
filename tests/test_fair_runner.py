@@ -102,7 +102,6 @@ def _fake_template(background_gtco2=40.0, n_years=10):
         configs=[],
         specie_axis=["CO2 FFI"],
         emissions=np.full((n_years, 1), background_gtco2),
-        concentration=None,
         forcing=None,
         species_configs=None,
         climate_configs=None,
@@ -135,3 +134,35 @@ def test_perturbation_scale_leaves_large_inventories_alone():
     assert runner._perturbation_scale(tmpl, {"CO2 FFI": huge}, years) == 1.0
     assert runner._perturbation_scale(tmpl, None, years) == 1.0
     assert runner._perturbation_scale(tmpl, {}, years) == 1.0
+
+
+def test_ch4_method_matches_the_calibration():
+    """The 1.4.1 ensemble is calibrated for Thornhill CH4 chemistry.
+
+    Under FaIR's default ("leach2021") the calibration's per-species
+    ch4_lifetime_chemical_sensitivity values are ignored, which silently
+    removes the CH4-lifetime response to NOx, VOC and N2O.
+    """
+    assert runner._CH4_METHOD == "thornhill2021"
+
+
+def test_nox_shortens_methane_lifetime():
+    """A NOx perturbation must move CH4 - the check that caught the wrong mode."""
+    import numpy as np
+    import pytest
+
+    pytest.importorskip("fair")
+    years = np.arange(2030, 2051)
+    perturbation = {"NOx": np.full(len(years), 10e9)}  # +10 Mt NOx/yr, unmistakable
+    tmpl = runner._template("ssp245", int(years[-1]))
+    f = runner._new_run(tmpl, 2, int(years[0]), int(years[-1]))
+    runner._apply_state(f, runner._spinup_state("ssp245", int(years[-1]), int(years[0])))
+    runner._apply_perturbation(f, tmpl, 1, perturbation, years, 1.0)
+    with runner._RUN_LOCK:
+        f.run(progress=False)
+
+    ch4 = tmpl.specie_axis.index("CH4")
+    concentration = f.concentration.values
+    delta = np.median(concentration[-1, 1, :, ch4] - concentration[-1, 0, :, ch4])
+    assert np.isfinite(delta)
+    assert delta < 0  # more NOx -> shorter CH4 lifetime -> less CH4

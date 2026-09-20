@@ -52,6 +52,14 @@ _SIM_START_YEAR = 1750
 
 OUTPUTS = ("radiative_forcing", "temperature")
 
+# The calibrated 1.4.1 ensemble is calibrated for - and distributed with - the
+# Thornhill (2021) methane-lifetime chemistry, which is what FaIR's own
+# calibrated-constrained example runs. FaIR itself defaults to "leach2021",
+# under which the per-species `ch4_lifetime_chemical_sensitivity` values in the
+# calibration are simply ignored: a NOx perturbation then leaves CH4 untouched
+# and the ozone precursors come out with the wrong sign.
+_CH4_METHOD = "thornhill2021"
+
 # FaIR keeps roughly a dozen (timebounds, scenario, config, specie) float64
 # arrays alive per run; used to size scenario batches against a memory budget.
 _ARRAYS_PER_SCENARIO = 12
@@ -193,7 +201,6 @@ class _Template(NamedTuple):
     configs: list
     specie_axis: list
     emissions: np.ndarray  # (timepoints, specie), 1750..end
-    concentration: np.ndarray  # (timebounds, specie)
     forcing: np.ndarray  # (timebounds, specie)
     species_configs: object  # xr.Dataset
     climate_configs: object  # xr.Dataset
@@ -258,7 +265,7 @@ def _calibrated_configs(end_year: int) -> _Configs:
     configs = _config_index(params_csv)
     species, properties = fair.io.read_properties(filename=props_csv)
 
-    f = fair.FAIR()
+    f = fair.FAIR(ch4_method=_CH4_METHOD)
     f.define_time(_SIM_START_YEAR, end_year, 1)
     f.define_scenarios(["calibration"])
     f.define_configs(configs)
@@ -284,14 +291,15 @@ def _calibrated_configs(end_year: int) -> _Configs:
 
 @lru_cache(maxsize=8)
 def _background(marker: str, end_year: int):
-    """RCMIP background emissions/concentrations/forcing for one marker.
+    """RCMIP background emissions and prescribed forcing for one marker.
 
     The RCMIP background is the same for every config, so only one config's
-    slice is kept and broadcast when a run is set up.
+    slice is kept and broadcast when a run is set up. Concentrations are not
+    taken from RCMIP - see :func:`_initialise_preindustrial`.
     """
     fair = require_fair()
     cfg = _calibrated_configs(end_year)
-    f = fair.FAIR()
+    f = fair.FAIR(ch4_method=_CH4_METHOD)
     f.define_time(_SIM_START_YEAR, end_year, 1)
     f.define_scenarios([marker])
     f.define_configs(cfg.configs)
@@ -300,7 +308,6 @@ def _background(marker: str, end_year: int):
     f.fill_from_rcmip()  # SSP marker background emissions
     return (
         f.emissions.values[:, 0, 0, :].copy(),
-        f.concentration.values[:, 0, 0, :].copy(),
         f.forcing.values[:, 0, 0, :].copy(),
         list(f.emissions.specie.values),
     )
@@ -313,14 +320,13 @@ def _template(marker: str, end_year: int) -> _Template:
     (and the marker-independent half survives a scenario switch).
     """
     cfg = _calibrated_configs(end_year)
-    emissions, concentration, forcing, specie_axis = _background(marker, end_year)
+    emissions, forcing, specie_axis = _background(marker, end_year)
     return _Template(
         species=cfg.species,
         properties=cfg.properties,
         configs=cfg.configs,
         specie_axis=specie_axis,
         emissions=emissions,
-        concentration=concentration,
         forcing=forcing,
         species_configs=cfg.species_configs,
         climate_configs=cfg.climate_configs,
@@ -335,7 +341,7 @@ def _noop():
 def _new_run(tmpl: _Template, n_scenarios: int, start_year: int, end_year: int):
     """Allocate a FAIR object and fill it from the cached template."""
     fair = require_fair()
-    f = fair.FAIR()
+    f = fair.FAIR(ch4_method=_CH4_METHOD)
     f.define_time(start_year, end_year, 1)
     f.define_scenarios([f"run{i}" for i in range(n_scenarios)])
     f.define_configs(tmpl.configs)
@@ -346,7 +352,6 @@ def _new_run(tmpl: _Template, n_scenarios: int, start_year: int, end_year: int):
     n_tp = f.emissions.shape[0]
     n_tb = f.forcing.shape[0]
     f.emissions.values[...] = tmpl.emissions[off : off + n_tp, None, None, :]
-    f.concentration.values[...] = tmpl.concentration[off : off + n_tb, None, None, :]
     f.forcing.values[...] = tmpl.forcing[off : off + n_tb, None, None, :]
     f.species_configs = tmpl.species_configs.copy(deep=True)
     f.climate_configs = tmpl.climate_configs.copy(deep=True)
@@ -361,6 +366,10 @@ def _new_run(tmpl: _Template, n_scenarios: int, start_year: int, end_year: int):
 
 def _initialise_preindustrial(f) -> None:
     fair = require_fair()
+    # Every specie is emissions-driven or calculated, so the concentration
+    # array is an output; only its first timebound is an initial condition,
+    # and it comes from the calibration (RCMIP leaves calculated species NaN).
+    fair.interface.initialise(f.concentration, f.species_configs["baseline_concentration"])
     fair.interface.initialise(f.forcing, 0)
     fair.interface.initialise(f.temperature, 0)
     fair.interface.initialise(f.cumulative_emissions, 0)

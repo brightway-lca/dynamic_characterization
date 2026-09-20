@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Route biogenic CO2 to `CO2 AFOLU` instead of `CO2 FFI` and give uptake flows their proper sign: `Carbon dioxide, non-fossil, resource correction` was counted as an emission, which (with biogenic CO2 mixed into the fossil pool) overstated net CO2 by ~8% for a typical ecoinvent inventory
 * Convert flows reported on a different mass basis than FAIR expects (nitric oxide to NO2, sulfur trioxide to SO2)
 * Log the flows that no FAIR species covers, so silent under-coverage is visible
+* Run FAIR with `ch4_method="thornhill2021"`, which is what the calibrated 1.4.1 ensemble is calibrated for (FaIR's own calibrated-constrained example uses it). Under FaIR's default (`leach2021`) the calibration's per-species `ch4_lifetime_chemical_sensitivity` values are ignored, so a NOx perturbation left methane completely untouched and the ozone precursors came out with the wrong sign (NOx as net warming). Implied GWP100 values moved towards the published ones: N2O 382 -> 293 (published 273), CH4 38 -> 35 (29.8), NOx +13 -> -57 (negative, as AR6 has it)
+* Initialize concentrations from the calibration's `baseline_concentration` instead of the RCMIP concentration table. RCMIP leaves FAIR's *calculated* species (notably equivalent effective stratospheric chlorine) as NaN, which the Thornhill methane-lifetime chemistry reads
 
 ## [1.4.2] - (2026-08-14)
 * The error raised when a prospective metric is calculated without a scenario now explains what to do: full import path, a copy-pasteable `set_scenario` call, and the available IAM-SSP-RCP combinations.

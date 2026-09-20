@@ -133,3 +133,5 @@ dmypy.json
 
 .DS_Store
 .superpowers
+# Generated from notebooks/ by docs/convert_notebooks.py
+/docs/content/examples/demos/
