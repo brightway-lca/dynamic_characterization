@@ -16,28 +16,18 @@ jobs:
       id-token: write
     steps:
     - uses: actions/checkout@main
+    - name: Install uv
+      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
     - name: Set up Python 3.11
-      uses: actions/setup-python@v7
-      with:
-        python-version: "3.11"
-    - name: Install pypa/build
-      run: >-
-        python -m
-        pip install
-        build
-        --user
+      run: uv python install 3.11
     - name: Build a binary wheel and a source tarball
-      run: >-
-        python -m
-        build
-        --outdir dist/
-        .
+      run: uv build --out-dir dist/
     - name: Publish distribution 📦 to Test PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         repository-url: https://test.pypi.org/legacy/
-        skip-existing: true
-        verbose: true
+        skip_existing: true
+        attestations: false
     - name: Publish distribution 📦 to PyPI
       if: startsWith(github.ref, 'refs/tags')
       uses: pypa/gh-action-pypi-publish@release/v1

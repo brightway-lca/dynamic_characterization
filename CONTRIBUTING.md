@@ -96,9 +96,9 @@ The package is published in three places, and each one is triggered differently:
 
 | Target | Triggered by | Automated |
 |---|---|---|
-| [PyPI](https://pypi.org/project/dynamic-characterization/) | pushing the release tag | yes, by `python-package-deploy.yml` |
+| [PyPI](https://pypi.org/project/dynamic-characterization/) | creating the GitHub release | yes, by `python-package-deploy.yml` |
 | [GitHub release](https://github.com/brightway-lca/dynamic_characterization/releases) | `gh release create` | no |
-| [conda `diepers` channel](https://anaconda.org/diepers/dynamic_characterization) | building the recipe locally | no |
+| [conda `diepers` channel](https://anaconda.org/diepers/dynamic_characterization) | `conda/build_upload.sh` | no, run locally |
 
 The version number lives in exactly one place, `dynamic_characterization/__init__.py`. `pyproject.toml` reads it through `tool.setuptools.dynamic`, so bumping that one line is enough.
 
@@ -138,7 +138,7 @@ git push origin vX.Y.Z
 
 !!! warning "This is the point of no return"
 
-    Pushing the tag is the irreversible step. `python-package-deploy.yml` publishes to PyPI on any tagged ref, and a version number can never be reused there - not even after deleting the release. Make sure the tag points where you think it does before pushing it.
+    Creating the release is the irreversible step. `python-package-deploy.yml` runs `on: release: [created]` and publishes to PyPI, and a version number can never be reused there - not even after deleting the release. Pushing the tag on its own is still safe (the workflow's `push` trigger only watches branches), so make sure the tag points where you think it does before running `gh release create`.
 
 Release notes are the changelog section for that version, copied verbatim - no rewriting, no summarising:
 
@@ -156,7 +156,7 @@ curl -s https://pypi.org/pypi/dynamic-characterization/json | python -c "import 
 
 ### 3. Publish to conda
 
-The conda package is built and uploaded by hand from a `conda/` recipe that is **not** in the repository (it is gitignored), against a checkout that is already at the released version - the recipe builds the working tree, so make sure `main` is checked out, clean, and pulled.
+The conda package is built and uploaded by hand, from a checkout that is already at the released version - the recipe builds the working tree (`source: path: ..`), so make sure `main` is checked out, clean, and pulled.
 
 One-time setup:
 
@@ -165,7 +165,15 @@ conda install -n base conda-build anaconda-client
 anaconda login          # needs write access to the `diepers` channel
 ```
 
-Then build and upload the recipe, and confirm:
+Then:
+
+```bash
+bash conda/build_upload.sh
+```
+
+The recipe generates its `run:` requirements from `pyproject.toml`, so the conda package and the wheel cannot declare different dependencies. If you add a dependency whose conda name differs from its PyPI name, add it to the `conda_names` mapping at the top of `conda/meta.yaml`. A dependency that conda has no new enough build for goes in `unpinned_on_conda` instead, with a comment saying why - `pip check` in the recipe's test section then reports the mismatch.
+
+Confirm the upload:
 
 ```bash
 conda search -c diepers dynamic_characterization
