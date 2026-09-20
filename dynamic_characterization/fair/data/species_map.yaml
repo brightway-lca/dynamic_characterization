@@ -1,16 +1,172 @@
-# Flow-name substrings (lowercase) -> FAIR species. First match wins.
-# `sign` defaults to +1; uptake / "in air" resource flows get -1 (set in code).
-species:
-  "carbon dioxide": "CO2 FFI"
-  "carbon monoxide": "CO"
-  "methane": "CH4"
+# Biosphere flows -> FAIR emission species.
+#
+# Matching is EXACT, never by substring: a substring rule like "methane" also
+# matches "Tetrafluoromethane", "Trifluoromethane", "Dichloromethane", ... and
+# would characterize every halocarbon as CH4. A flow is looked up by its
+# lower-cased name first, and by CAS number as a fallback so that other
+# naming conventions (older ecoinvent, SimaPro, ...) still resolve.
+#
+# CO2 is deliberately absent from `by_cas`: fossil, biogenic and uptake flows
+# share CAS 124-38-9 but must be routed to different species and signs.
+#
+# Individual NMVOC species (ethane, toluene, ...) are not mapped: inventories
+# usually carry the aggregate NMVOC flow as well, and mapping both would
+# double-count the ozone precursor.
+
+by_name:
+  # --- CO2 -----------------------------------------------------------------
+  "carbon dioxide, fossil": "CO2 FFI"
+  "carbon dioxide, non-fossil": "CO2 AFOLU"
+  "carbon dioxide, from soil or biomass stock": "CO2 AFOLU"
+  "carbon dioxide, to soil or biomass stock": "CO2 AFOLU"
+  "carbon dioxide, non-fossil, resource correction": "CO2 AFOLU"
+  "carbon dioxide, in air": "CO2 AFOLU"
+  # --- other long-lived GHGs ----------------------------------------------
+  "methane, fossil": "CH4"
+  "methane, non-fossil": "CH4"
+  "methane, from soil or biomass stock": "CH4"
   "dinitrogen monoxide": "N2O"
-  "sulfur dioxide": "Sulfur"
+  # --- short-lived climate forcers ----------------------------------------
+  "carbon monoxide, fossil": "CO"
+  "carbon monoxide, non-fossil": "CO"
+  "carbon monoxide, from soil or biomass stock": "CO"
+  "nmvoc, non-methane volatile organic compounds": "VOC"
+  "voc, volatile organic compounds": "VOC"
   "nitrogen oxides": "NOx"
+  "nitric oxide": "NOx"
+  "dinitrogen tetroxide": "NOx"
+  "sulfur dioxide": "Sulfur"
+  "sulfur oxides": "Sulfur"
+  "sulfur trioxide": "Sulfur"
   "ammonia": "NH3"
-  "nmvoc": "VOC"
-  "non-methane volatile": "VOC"
-  "carbon, in air": "CO2 AFOLU"
+  # --- F-gases -------------------------------------------------------------
+  "sulfur hexafluoride": "SF6"
+  "nitrogen fluoride": "NF3"
+  "nitrogen trifluoride": "NF3"
+  "sulfuryl fluoride": "SO2F2"
+  "tetrafluoromethane": "CF4"
+  "hexafluoroethane": "C2F6"
+  "octafluoropropane": "C3F8"
+  "octafluorocyclobutane": "c-C4F8"
+  "decafluorobutane": "C4F10"
+  "perfluoropentane": "C5F12"
+  "tetradecafluorohexane": "C6F14"
+  "trifluoromethane": "HFC-23"
+  "difluoromethane": "HFC-32"
+  "pentafluoroethane": "HFC-125"
+  "1,1,1,2-tetrafluoroethane": "HFC-134a"
+  "1,1,1-trifluoroethane": "HFC-143a"
+  "1,1-difluoroethane": "HFC-152a"
+  "1,1,1,2,3,3,3-heptafluoropropane": "HFC-227ea"
+  # --- ozone-depleting substances -----------------------------------------
+  "trichlorofluoromethane": "CFC-11"
+  "dichlorodifluoromethane": "CFC-12"
+  "1,1,2-trichloro-1,2,2-trifluoroethane": "CFC-113"
+  "1,2-dichloro-1,1,2,2-tetrafluoroethane": "CFC-114"
+  "monochloropentafluoroethane": "CFC-115"
+  "chlorodifluoromethane": "HCFC-22"
+  "1,1-dichloro-1-fluoroethane": "HCFC-141b"
+  "1-chloro-1,1-difluoroethane": "HCFC-142b"
+  "carbon tetrachloride": "CCl4"
+  "chloroform": "CHCl3"
+  "dichloromethane": "CH2Cl2"
+  "methylchloride": "CH3Cl"
+  "1,1,1-trichloroethane": "CH3CCl3"
+  "bromomethane": "CH3Br"
+  "bromochlorodifluoromethane": "Halon-1211"
+  "bromotrifluoromethane": "Halon-1301"
+  "dibromotetrafluoroethane": "Halon-2402"
+  # --- older ecoinvent / SimaPro spellings of the same substances ----------
+  "methane, tetrafluoro-, r-14": "CF4"
+  "ethane, hexafluoro-, hfc-116": "C2F6"
+  "methane, trifluoro-, hfc-23": "HFC-23"
+  "methane, difluoro-, hfc-32": "HFC-32"
+  "ethane, pentafluoro-, hfc-125": "HFC-125"
+  "ethane, 1,1,1,2-tetrafluoro-, hfc-134a": "HFC-134a"
+  "ethane, 1,1,1-trifluoro-, hfc-143a": "HFC-143a"
+  "ethane, 1,1-difluoro-, hfc-152a": "HFC-152a"
+  "methane, trichlorofluoro-, cfc-11": "CFC-11"
+  "methane, dichlorodifluoro-, cfc-12": "CFC-12"
+  "ethane, 1,1,2-trichloro-1,2,2-trifluoro-, cfc-113": "CFC-113"
+  "ethane, 1,2-dichloro-1,1,2,2-tetrafluoro-, cfc-114": "CFC-114"
+  "ethane, chloropentafluoro-, cfc-115": "CFC-115"
+  "methane, chlorodifluoro-, hcfc-22": "HCFC-22"
+  "ethane, 1,1-dichloro-1-fluoro-, hcfc-141b": "HCFC-141b"
+  "ethane, 1-chloro-1,1-difluoro-, hcfc-142b": "HCFC-142b"
+  "methane, tetrachloro-, r-10": "CCl4"
+  "methane, trichloro-, hcc-20": "CHCl3"
+  "methane, dichloro-, hcc-30": "CH2Cl2"
+  "methane, monochloro-, r-40": "CH3Cl"
+  "ethane, 1,1,1-trichloro-, hcfc-140": "CH3CCl3"
+  "methane, bromo-, halon 1001": "CH3Br"
+  "methane, bromochlorodifluoro-, halon 1211": "Halon-1211"
+  "methane, bromotrifluoro-, halon 1301": "Halon-1301"
+  "ethane, 1,2-dibromotetrafluoro-, halon 2402": "Halon-2402"
+
+# CAS number -> FAIR species, used when the name is not recognized. Keys use
+# the same zero-padded spelling as ipcc_ar6/data/decay_multipliers.json;
+# lookups are normalized, so unpadded numbers resolve too.
+by_cas:
+  "000074-82-8": "CH4"
+  "010024-97-2": "N2O"
+  "000630-08-0": "CO"
+  "007446-09-5": "Sulfur"
+  "007446-11-9": "Sulfur"
+  "011104-93-1": "NOx"
+  "010102-43-9": "NOx"
+  "010544-72-6": "NOx"
+  "007664-41-7": "NH3"
+  "002551-62-4": "SF6"
+  "007783-54-2": "NF3"
+  "002699-79-8": "SO2F2"
+  "000075-73-0": "CF4"
+  "000076-16-4": "C2F6"
+  "000076-19-7": "C3F8"
+  "000115-25-3": "c-C4F8"
+  "000355-25-9": "C4F10"
+  "000678-26-2": "C5F12"
+  "000355-42-0": "C6F14"
+  "000075-46-7": "HFC-23"
+  "000075-10-5": "HFC-32"
+  "000354-33-6": "HFC-125"
+  "000811-97-2": "HFC-134a"
+  "000420-46-2": "HFC-143a"
+  "000075-37-6": "HFC-152a"
+  "000431-89-0": "HFC-227ea"
+  "000075-69-4": "CFC-11"
+  "000075-71-8": "CFC-12"
+  "000076-13-1": "CFC-113"
+  "000076-14-2": "CFC-114"
+  "000076-15-3": "CFC-115"
+  "000075-45-6": "HCFC-22"
+  "001717-00-6": "HCFC-141b"
+  "000075-68-3": "HCFC-142b"
+  "000056-23-5": "CCl4"
+  "000067-66-3": "CHCl3"
+  "000075-09-2": "CH2Cl2"
+  "000074-87-3": "CH3Cl"
+  "000071-55-6": "CH3CCl3"
+  "000074-83-9": "CH3Br"
+  "000353-59-3": "Halon-1211"
+  "000075-63-8": "Halon-1301"
+  "000124-73-2": "Halon-2402"
+
+# Flows that remove a species from the atmosphere rather than emitting it.
+signs:
+  "carbon dioxide, in air": -1
+  "carbon dioxide, to soil or biomass stock": -1
+  "carbon dioxide, non-fossil, resource correction": -1
+
+# FAIR expects some species on a different mass basis than the inventory
+# reports them (NOx as NO2, sulfur as SO2). Factor applied to the flow amount.
+mass_basis:
+  by_name:
+    "nitric oxide": 1.5335 # NO -> NO2
+    "sulfur trioxide": 0.8002 # SO3 -> SO2
+  by_cas:
+    "010102-43-9": 1.5335
+    "007446-11-9": 0.8002
+
 # Precursor species -> FAIR forcing response channel.
 # NOTE: This mapping is informational/reserved metadata documenting which forcing
 # channel each precursor drives in FAIR. FAIR applies these responses natively when
@@ -22,5 +178,3 @@ precursors:
   "CO": "Ozone"
   "Sulfur": "Aerosol-radiation interactions"
   "NH3": "Aerosol-radiation interactions"
-# Species whose default emission sign is negative (uptake).
-negative_sign_species: []

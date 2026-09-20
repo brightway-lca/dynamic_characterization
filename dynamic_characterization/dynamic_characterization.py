@@ -33,27 +33,34 @@ from dynamic_characterization.prospective.radiative_forcing import (
 
 
 def _add_fair_flow_names(dynamic_inventory_df):
-    """Best-effort: add a 'flow_name' column mapping biosphere flow ids to names.
+    """Best-effort: add 'flow_name' and 'flow_cas' columns for biosphere flow ids.
 
-    Looks up names from the biosphere database. Never raises: if the project /
-    biosphere / a node is unavailable, the (possibly partial) frame is returned
-    unchanged so the FAIR path degrades gracefully (logs at debug level) instead of
-    crashing. If a 'flow_name' column already exists it is left untouched.
+    The FAIR species map matches on the flow name and falls back to the CAS
+    number, so both are looked up from the biosphere database. Never raises: if
+    the project / biosphere / a node is unavailable, the (possibly partial)
+    frame is returned unchanged so the FAIR path degrades gracefully (logs at
+    debug level) instead of crashing. An existing 'flow_name' column is left
+    untouched.
     """
     if "flow_name" in dynamic_inventory_df.columns:
         return dynamic_inventory_df
     try:
         biosphere_db = bd.Database(bd.config.biosphere)
-        names = {}
+        names, cas_numbers = {}, {}
         for fid in dynamic_inventory_df["flow"].unique():
             try:
-                names[fid] = biosphere_db.get(id=fid)["name"]
+                node = biosphere_db.get(id=fid)
             except Exception:
                 continue
+            names[fid] = node["name"]
+            cas = node.get("CAS number")
+            if cas:
+                cas_numbers[fid] = cas
         if not names:
             return dynamic_inventory_df
         return dynamic_inventory_df.assign(
-            flow_name=dynamic_inventory_df["flow"].map(names)
+            flow_name=dynamic_inventory_df["flow"].map(names),
+            flow_cas=dynamic_inventory_df["flow"].map(cas_numbers),
         )
     except Exception as exc:
         logger.debug("Could not enrich inventory with flow names: {}", exc)

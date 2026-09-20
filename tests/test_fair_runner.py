@@ -63,3 +63,75 @@ def test_run_fair_rejects_bad_output():
         runner.run_fair(
             "ssp245", None, __import__("numpy").array([2030, 2031]), output="bogus"
         )
+
+
+def test_batch_size_is_at_least_one_and_shrinks_with_size():
+    import numpy as np  # noqa: F401  (kept local to the test)
+
+    small = runner._batch_size(n_timebounds=80, n_configs=841, n_species=61)
+    large = runner._batch_size(n_timebounds=350, n_configs=841, n_species=61)
+    huge = runner._batch_size(n_timebounds=10**6, n_configs=841, n_species=61)
+    assert small >= large >= 1
+    assert huge == 1
+
+
+def test_cache_key_distinguishes_perturbations():
+    import numpy as np
+
+    years = np.array([2030, 2031])
+    baseline = runner._cache_key("ssp245", years, None)
+    assert baseline == runner._cache_key("ssp245", years, {})
+    co2 = runner._cache_key("ssp245", years, {"CO2 FFI": np.array([1.0, 0.0])})
+    ch4 = runner._cache_key("ssp245", years, {"CH4": np.array([1.0, 0.0])})
+    other_amount = runner._cache_key(
+        "ssp245", years, {"CO2 FFI": np.array([2.0, 0.0])}
+    )
+    other_marker = runner._cache_key("ssp126", years, {"CO2 FFI": np.array([1.0, 0.0])})
+    assert len({baseline, co2, ch4, other_amount, other_marker}) == 5
+    # Same perturbation, same key: that is what makes the memoization work.
+    assert co2 == runner._cache_key("ssp245", years, {"CO2 FFI": np.array([1.0, 0.0])})
+
+
+def _fake_template(background_gtco2=40.0, n_years=10):
+    """Template stub with a constant CO2 background, for scale calculations."""
+    import numpy as np
+
+    return runner._Template(
+        species=[],
+        properties={},
+        configs=[],
+        specie_axis=["CO2 FFI"],
+        emissions=np.full((n_years, 1), background_gtco2),
+        concentration=None,
+        forcing=None,
+        species_configs=None,
+        climate_configs=None,
+        ebms=None,
+    )
+
+
+def test_perturbation_scale_lifts_lca_sized_pulses():
+    import numpy as np
+
+    years = np.arange(1750, 1760)
+    tmpl = _fake_template()
+    pulse = np.zeros(len(years))
+    pulse[1] = 1e4  # 10 t CO2, a typical LCA magnitude
+
+    scale = runner._perturbation_scale(tmpl, {"CO2 FFI": pulse}, years)
+    # Scaled peak emission is the target fraction of the background.
+    scaled_peak = pulse.max() * runner._unit_factor("CO2 FFI") * scale
+    assert scaled_peak == pytest.approx(runner._LINEARIZATION_TARGET * 40.0)
+
+
+def test_perturbation_scale_leaves_large_inventories_alone():
+    import numpy as np
+
+    years = np.arange(1750, 1760)
+    tmpl = _fake_template()
+    huge = np.zeros(len(years))
+    huge[0] = 1e16  # 10 Gt CO2: already far above the noise floor
+
+    assert runner._perturbation_scale(tmpl, {"CO2 FFI": huge}, years) == 1.0
+    assert runner._perturbation_scale(tmpl, None, years) == 1.0
+    assert runner._perturbation_scale(tmpl, {}, years) == 1.0

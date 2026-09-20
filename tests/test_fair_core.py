@@ -170,3 +170,114 @@ def test_characterize_with_fair_runs(monkeypatch):
     )
     assert list(out.columns) == ["date", "amount", "flow", "activity", "quantile"]
     assert set(out["quantile"].unique()) == {50.0}
+
+
+# ---------------------------------------------------------------------------
+# Vectorized aggregation / attribution
+# ---------------------------------------------------------------------------
+
+
+def _naive_aggregate(df, years):
+    """Row-by-row reference for _aggregate_inventory."""
+    year_index = {int(y): i for i, y in enumerate(years)}
+    per_pair = {}
+    for _, row in df.iterrows():
+        species, sign = core.species_map.resolve_species(str(row["flow_name"]))
+        if species is None:
+            continue
+        yi = year_index.get(int(pd.Timestamp(row["date"]).year))
+        if yi is None:
+            continue
+        key = (row["flow"], row["activity"])
+        signed = per_pair.setdefault(key, (species, np.zeros(len(years))))[1]
+        signed[yi] += sign * float(row["amount"])
+    return per_pair
+
+
+def test_aggregate_inventory_matches_row_loop():
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(
+                ["2030-01-01", "2030-06-01", "2031-01-01", "2030-01-01", "2031-01-01"]
+            ),
+            "amount": [10.0, 4.0, -5.0, 2.0, 7.0],
+            "flow": [1, 1, 1, 2, 3],
+            "activity": ["a", "a", "a", "b", "a"],
+            "flow_name": [
+                "Carbon dioxide, fossil",
+                "Carbon dioxide, fossil",
+                "Carbon dioxide, fossil",
+                "Methane, fossil",
+                "Some unmappable flow",
+            ],
+        }
+    )
+    years = np.array([2030, 2031])
+    species_names, species_of_pair, flow_ids, activity_ids, yearly = (
+        core._aggregate_inventory(df, years)
+    )
+    expected = _naive_aggregate(df, years)
+
+    assert len(flow_ids) == len(expected)  # the unmappable flow is dropped
+    for i, (flow, activity) in enumerate(zip(flow_ids, activity_ids)):
+        species, signed = expected[(flow, activity)]
+        assert species_names[species_of_pair[i]] == species
+        np.testing.assert_allclose(yearly[i], signed)
+
+
+def test_uptake_flows_get_mirrored_quantiles(monkeypatch):
+    """A flow with negative cumulative emissions flips the quantile order."""
+    quantiles = (2.5, 50.0, 97.5)
+    # Three-config ensemble with a clearly ordered response, in both years.
+    perturbed = np.array([[1.0, 2.0], [2.0, 4.0], [3.0, 6.0]])
+
+    def fake_runs(marker, years_, perturbations, max_batch=None):
+        zero = np.zeros_like(perturbed)
+        return [
+            {
+                "radiative_forcing": zero if not perturbation else perturbed,
+                "temperature": zero if not perturbation else perturbed,
+                "scale": 1.0,
+            }
+            for perturbation in perturbations
+        ]
+
+    monkeypatch.setattr(core.runner, "run_perturbations", fake_runs)
+    monkeypatch.setattr(core.runner, "require_fair", lambda: None)
+    core.config.set_fair_scenario("SSP2", "4.5")
+
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2030-01-01", "2030-01-01"]),
+            "amount": [3.0, 1.0],
+            "flow": [1, 2],
+            "activity": ["release", "uptake"],
+            # Both are biogenic CO2 (same FAIR species), one released, one
+            # taken up - so they share a per-kg response and mirror each other.
+            "flow_name": ["Carbon dioxide, non-fossil", "Carbon dioxide, in air"],
+        }
+    )
+    out = core.characterize_with_fair(
+        df, output="radiative_forcing", quantiles=quantiles, time_horizon=1
+    )
+
+    # Net species emission is 3 - 1 = 2 kg, constant over both years.
+    per_kg = perturbed / 2.0
+    for year_index, year in enumerate((2030, 2031)):
+        rows = out[out["date"] == np.datetime64(f"{year}-01-01")]
+        release = rows[rows["activity"] == "release"].set_index("quantile")
+        uptake = rows[rows["activity"] == "uptake"].set_index("quantile")
+        for quantile in quantiles:
+            expected_release = (
+                np.percentile(per_kg[:, year_index], quantile) * 3.0
+            )
+            # Cumulative uptake is negative, so the mirrored quantile applies.
+            expected_uptake = (
+                np.percentile(per_kg[:, year_index], 100.0 - quantile) * -1.0
+            )
+            np.testing.assert_allclose(
+                release.loc[quantile, "amount"], expected_release
+            )
+            np.testing.assert_allclose(
+                uptake.loc[quantile, "amount"], expected_uptake
+            )
