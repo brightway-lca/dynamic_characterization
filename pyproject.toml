@@ -62,6 +62,9 @@ dev = [
     "setuptools",
 ]
 fair = ["fair>=2.2", "pooch"]
+# For the bw_timex case study in notebooks/fair_dynamic_lcia_demo.ipynb.
+# bw_timex itself requires Python >= 3.11, unlike this package.
+timex = ["bw_timex>=1.4; python_version >= '3.11'"]
 
 [tool.setuptools]
 license-files = ["LICENSE"]
@@ -119,11 +122,5 @@ demo = [
     "bw-temporalis>=1.2.0",
     "bw2data>=4.5.4",
     "bw2io>=0.9.14",
-    "ipykernel>=6.31.0",
-]
-# Needed for the bw_timex case study in notebooks/fair_dynamic_lcia_demo.ipynb.
-# bw_timex itself requires Python >= 3.11, unlike this package.
-timex = [
-    "bw_timex>=1.4; python_version >= '3.11'",
     "ipykernel>=6.31.0",
 ]
