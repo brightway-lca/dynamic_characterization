@@ -6,7 +6,7 @@
 ![Conda - License](https://img.shields.io/conda/l/diepers/dynamic_characterization)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/brightway-lca/dynamic_characterization/main?labpath=notebooks%2Fdynamic_characterization_demo.ipynb)
 
-This is a package for the dynamic characterization of Life Cycle Inventories with temporal information. It includes a collection of dynamic characterization functions for various environmental flows. We also provide a simple interface to apply these functions to an existing dynamic LCI (coming from, e.g., [bw_temporalis](https://github.com/brightway-lca/bw_temporalis) or [bw_timex](https://github.com/brightway-lca/bw_timex)).
+This is a package for the dynamic characterization of Life Cycle Inventories with temporal information. It includes a collection of dynamic characterization functions for various environmental flows. We also provide a simple interface to apply these functions to an existing dynamic LCI (coming from, e.g., [bw_temporalis](https://github.com/brightway-lca/bw_temporalis), [bw_timex](https://github.com/brightway-lca/bw_timex) or [optimex](https://github.com/RWTH-LTT/optimex).
 
 The following dynamic characterization functions are currently included:
 
