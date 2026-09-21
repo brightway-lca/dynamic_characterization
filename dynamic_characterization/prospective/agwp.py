@@ -51,9 +51,10 @@ def _get_year_index(emission_year: int, years: np.ndarray) -> int:
     """
     Get index for emission year in RE data, with clamping and warnings.
 
-    RE data spans 2020-2150. Years outside 2030-2100 are clamped.
+    The bounds are taken from the RE data itself (currently 2020-2150), so they
+    follow the data instead of the narrower range reported in the paper tables.
     """
-    min_year, max_year = 2030, 2100
+    min_year, max_year = int(years[0]), int(years[-1])
 
     if emission_year < min_year:
         warnings.warn(
@@ -87,7 +88,7 @@ def agwp_co2(
     Parameters
     ----------
     emission_year : int
-        Year of emission (2030-2100, clamped if outside)
+        Year of emission (2020-2150, clamped if outside)
     time_horizon : int
         Integration period in years
     time_varying_re : bool
@@ -144,7 +145,7 @@ def agwp_ch4(
     Parameters
     ----------
     emission_year : int
-        Year of emission (2030-2100, clamped if outside)
+        Year of emission (2020-2150, clamped if outside)
     time_horizon : int
         Integration period in years
     time_varying_re : bool
@@ -195,7 +196,7 @@ def agwp_n2o(
     Parameters
     ----------
     emission_year : int
-        Year of emission (2030-2100, clamped if outside)
+        Year of emission (2020-2150, clamped if outside)
     time_horizon : int
         Integration period in years
     time_varying_re : bool

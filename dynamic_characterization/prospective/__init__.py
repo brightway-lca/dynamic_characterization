@@ -1,8 +1,10 @@
 """
 Prospective characterization factors based on Watanabe et al. (2026).
 
-Implements scenario-based characterization using time-varying radiative
-efficiencies from IAM-SSP-RCP scenarios.
+Implements scenario-based characterization using IAM-SSP-RCP scenarios. Both the
+radiative efficiencies and, for CO2, the impulse response function depend on the
+scenario: RE changes with the projected background concentrations, and the CO2 IRF
+changes with the carbon cycle feedbacks of the RCP. CH4 and N2O keep fixed lifetimes.
 
 Reference: https://doi.org/10.1021/acs.est.5b01118
 """

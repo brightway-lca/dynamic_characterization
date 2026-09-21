@@ -2,7 +2,8 @@
 Watanabe prospective characterization functions.
 
 Returns radiative forcing time series matching the existing ipcc_ar6 API,
-but using scenario-based radiative efficiencies from Watanabe et al. (2026).
+but using scenario-based radiative efficiencies and, for CO2, a scenario-based
+impulse response function from Watanabe et al. (2026).
 
 Reference: https://doi.org/10.1021/acs.est.5b01118
 """
@@ -47,9 +48,10 @@ def _get_year_index(emission_year: int, years: np.ndarray) -> int:
     """
     Get index for emission year in RE data, with clamping and warnings.
 
-    RE data spans 2020-2150. Years outside 2030-2100 are clamped.
+    The bounds are taken from the RE data itself (currently 2020-2150), so they
+    follow the data instead of the narrower range reported in the paper tables.
     """
-    min_year, max_year = 2030, 2100
+    min_year, max_year = int(years[0]), int(years[-1])
 
     if emission_year < min_year:
         warnings.warn(
@@ -81,7 +83,8 @@ def characterize_co2(
     """
     Calculate radiative forcing time series for 1 kg CO2 emission.
 
-    Uses scenario-based radiative efficiencies from Watanabe et al. (2026).
+    Uses scenario-based radiative efficiencies and a scenario-based (RCP-specific)
+    CO2 impulse response function from Watanabe et al. (2026).
     Scenario must be set via prospective.set_scenario() before calling.
 
     Parameters
@@ -193,7 +196,9 @@ def characterize_ch4(
     """
     Calculate radiative forcing time series for 1 kg CH4 emission.
 
-    Uses scenario-based radiative efficiencies from Watanabe et al. (2026).
+    Uses scenario-based radiative efficiencies from Watanabe et al. (2026). The
+    impulse response function uses a fixed atmospheric lifetime; only CO2 has a
+    scenario-dependent IRF.
     Scenario must be set via prospective.set_scenario() before calling.
 
     This includes only direct effects. For indirect effects (ozone, water vapor),
@@ -282,7 +287,9 @@ def characterize_n2o(
     """
     Calculate radiative forcing time series for 1 kg N2O emission.
 
-    Uses scenario-based radiative efficiencies from Watanabe et al. (2026).
+    Uses scenario-based radiative efficiencies from Watanabe et al. (2026). The
+    impulse response function uses a fixed atmospheric lifetime; only CO2 has a
+    scenario-dependent IRF.
     Scenario must be set via prospective.set_scenario() before calling.
 
     Parameters

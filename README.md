@@ -49,7 +49,7 @@ If you work with [Brightway](https://docs.brightway.dev/en/latest/), pass an imp
 The full documentation is at [dynamic-characterization.readthedocs.io](https://dynamic-characterization.readthedocs.io/en/latest/):
 
 - [Usage](https://dynamic-characterization.readthedocs.io/en/latest/content/usage/) - the workflow in full, and every metric you can ask for
-- [Prospective characterization](https://dynamic-characterization.readthedocs.io/en/latest/content/prospective/) - scenario-based characterization factors: choosing an IAM-SSP-RCP scenario, the IPCC fallback for unsupported GHGs, and time-varying radiative efficiency
+- [Prospective characterization](https://dynamic-characterization.readthedocs.io/en/latest/content/prospective/) - scenario-based characterization factors: choosing an IAM-SSP-RCP scenario, the IPCC fallback for unsupported GHGs, and scenario-dependent radiative efficiency and CO2 impulse response
 - [Examples](https://dynamic-characterization.readthedocs.io/en/latest/content/examples/) - the demo notebooks, rendered
 - [API reference](https://dynamic-characterization.readthedocs.io/en/latest/api/) - including how to write your own characterization function
 

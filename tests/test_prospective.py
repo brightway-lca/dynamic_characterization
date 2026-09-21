@@ -1,5 +1,6 @@
 """Tests for prospective prospective characterization module."""
 
+import warnings
 import pytest
 import numpy as np
 import importlib.util
@@ -1209,3 +1210,50 @@ def test_pgtp_characterization():
     assert pgtp_n2o > pgtp_ch4
     # N2O pGTP100 should be in reasonable range (~200-400)
     assert 150 < pgtp_n2o < 450
+
+
+def test_emission_year_bounds_follow_data():
+    """Emission years are clamped to the range covered by the RE data, not 2030-2100."""
+    config.set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
+
+    years = data_loader.load_re_co2("IMAGE")["_years"]
+    assert (int(years[0]), int(years[-1])) == (2020, 2150)
+
+    # Years the SI tables don't report but the data covers: no warning, distinct results
+    for year in (2020, 2025, 2120):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            agwp.agwp_co2(emission_year=year, time_horizon=100)
+
+    assert agwp.agwp_co2(emission_year=2020) != agwp.agwp_co2(emission_year=2030)
+
+    # Outside the data: clamped with a warning, equal to the boundary year
+    with pytest.warns(UserWarning, match="clamping to 2020"):
+        assert agwp.agwp_co2(emission_year=2010) == agwp.agwp_co2(emission_year=2020)
+
+    with pytest.warns(UserWarning, match="clamping to 2150"):
+        assert agwp.agwp_co2(emission_year=2200) == agwp.agwp_co2(emission_year=2150)
+
+
+def test_valid_scenarios_match_data_files():
+    """VALID_SCENARIOS lists exactly the IAM-SSP-RCP combinations present in the data."""
+    loaders = {
+        "CO2": data_loader.load_re_co2,
+        "CH4": data_loader.load_re_ch4,
+        "N2O": data_loader.load_re_n2o,
+    }
+    iams = {iam for iam, _, _ in config.VALID_SCENARIOS}
+
+    for gas, loader in loaders.items():
+        in_data = {
+            (iam, ssp, rcp)
+            for iam in iams
+            for ssp, rcps in loader(iam).items()
+            if ssp != "_years"
+            for rcp in rcps
+        }
+        assert in_data == config.VALID_SCENARIOS, (
+            f"{gas} RE data and VALID_SCENARIOS disagree: "
+            f"only in data {sorted(in_data - config.VALID_SCENARIOS)}, "
+            f"only in config {sorted(config.VALID_SCENARIOS - in_data)}"
+        )
