@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.3] - (2026-08-21)
+* Fixed prospective RF being constrained to after 2030 even if earlier data exists
+
 ## [1.4.2] - (2026-08-14)
 * The error raised when a prospective metric is calculated without a scenario now explains what to do: full import path, a copy-pasteable `set_scenario` call, and the available IAM-SSP-RCP combinations.
 * Fixed `TypeError: ... got an unexpected keyword argument 'time_varying_re'` for the `pGWP` and `pGTP` metrics: `time_varying_re` was passed to every characterization function, including the IPCC AR6 fallback functions (CO and the GHGs from `decay_multipliers.json`), which don't accept it.
