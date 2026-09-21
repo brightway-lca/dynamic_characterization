@@ -8,14 +8,17 @@ tags:
 
 # Prospective Characterization
 
-The `prospective` module provides **prospective characterization factors (pCFs)** based on [Watanabe et al. (2026)](https://pubs.acs.org/doi/10.1021/acs.est.5c12391). Unlike conventional characterization factors that use fixed radiative efficiencies, prospective CFs account for how atmospheric conditions change over time under different climate scenarios.
+The `prospective` module provides **prospective characterization factors (pCFs)** based on [Watanabe et al. (2026)](https://pubs.acs.org/doi/10.1021/acs.est.5c12391). Unlike conventional characterization factors, which use a fixed radiative efficiency and a fixed impulse response function, prospective CFs account for how atmospheric conditions change over time under different climate scenarios.
 
 ## Why Use Prospective Characterization?
 
 Traditional characterization factors (like GWP100) assume constant atmospheric concentrations when calculating radiative forcing. However, greenhouse gas concentrations are projected to change significantly under different climate scenarios. This means:
 
 - **Higher CO2 concentrations** → Lower radiative efficiency per additional kg CO2 (saturation effect)
+- **Different carbon cycle feedbacks** → Different CO2 impulse response function → More of an emitted kg stays airborne under high-emission scenarios
 - **Different scenarios** → Different atmospheric evolution → Different characterization factors
+
+Both terms of the AGWP integral therefore depend on the scenario, not just the radiative efficiency. For CO2 the IRF is RCP-specific: the airborne fraction 100 years after the emission ranges from 0.46 under RCP2.6 to 0.66 under RCP8.5. CH4 and N2O keep fixed atmospheric lifetimes (11.8 and 109 years), so only their RE is scenario-dependent.
 
 For LCA studies looking at future systems (e.g., infrastructure with 50+ year lifetimes), prospective characterization provides more scenario-consistent results.
 
@@ -23,7 +26,7 @@ For LCA studies looking at future systems (e.g., infrastructure with 50+ year li
 
 | Metric | Output | Description |
 |--------|--------|-------------|
-| `prospective_radiative_forcing` | W/m² time series | Radiative forcing using scenario-based radiative efficiencies |
+| `prospective_radiative_forcing` | W/m² time series | Radiative forcing using scenario-based radiative efficiencies (and, for CO2, a scenario-based IRF) |
 | `pGWP` | kg CO2eq | Prospective Global Warming Potential - integrated radiative forcing relative to CO2 |
 | `pGTP` | kg CO2eq | Prospective Global Temperature Potential - endpoint temperature change relative to CO2 |
 
@@ -35,11 +38,14 @@ The Watanabe module uses Integrated Assessment Model (IAM) scenarios combining S
 
 | IAM | SSP | Available RCPs |
 |-----|-----|----------------|
-| IMAGE | SSP1 | 2.6, 4.5 |
-| AIM | SSP3 | 4.5, 6.0 |
-| GCAM4 | SSP4 | 2.6, 4.5, 6.0 |
-| MESSAGE | SSP2 | 4.5, 6.0 |
-| REMIND | SSP5 | 4.5, 8.5 |
+| IMAGE | SSP1 | 2.6, 4.5, 8.5 |
+| MESSAGE | SSP2 | 2.6, 4.5, 6.0, 8.5 |
+| AIM | SSP3 | 4.5, 6.0, 8.5 |
+| GCAM4 | SSP4 | 2.6, 4.5, 6.0, 8.5 |
+| REMIND | SSP5 | 2.6, 4.5, 6.0, 8.5 |
+
+Each IAM comes with exactly one SSP. The full list is also available at runtime as
+`dynamic_characterization.prospective.VALID_SCENARIOS`.
 
 ### Setting a Scenario
 
@@ -192,17 +198,25 @@ The difference is typically small (<5%) for most scenarios but can be larger for
 
 The prospective characterization functions use the emission date to look up the appropriate radiative efficiency:
 
-- **Emission years 2030-2100**: Uses exact year data from Watanabe SI tables
-- **Emission years < 2030**: Clamped to 2030 with a warning
-- **Emission years > 2100**: Clamped to 2100 with a warning
+The bounds come from the RE data itself, which currently spans 2020-2150:
+
+- **Emission years 2020-2150**: Uses exact year data from Watanabe SI tables
+- **Emission years < 2020**: Clamped to 2020 with a warning
+- **Emission years > 2150**: Clamped to 2150 with a warning
 
 ```python
 # Emissions at year 2050 - uses 2050 RE data
 series_2050 = MockSeries(date="2050-06-15", amount=1.0, flow="CO2")
 
-# Emissions at year 2010 - clamped to 2030 (with warning)
+# Emissions at year 2010 - clamped to 2020 (with warning)
 series_2010 = MockSeries(date="2010-01-01", amount=1.0, flow="CO2")
 ```
+
+Note that the Watanabe paper only reports characterization factors for 2030-2100.
+Emission years outside that window use the same underlying RE data but are not
+covered by the published tables. With `time_varying_re=True`, an emission year
+close to 2150 also has its RE held constant once the decay period runs past the
+end of the data.
 
 ## Direct AGWP/AGTP Access
 

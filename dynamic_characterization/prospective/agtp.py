@@ -93,7 +93,7 @@ def agtp_co2(
     Parameters
     ----------
     emission_year : int
-        Year of emission (2030-2100, clamped if outside)
+        Year of emission (2020-2150, clamped if outside)
     time_horizon : int
         Integration period in years
     time_varying_re : bool
@@ -151,7 +151,7 @@ def agtp_ch4(
     Parameters
     ----------
     emission_year : int
-        Year of emission (2030-2100, clamped if outside)
+        Year of emission (2020-2150, clamped if outside)
     time_horizon : int
         Integration period in years
     time_varying_re : bool
@@ -206,7 +206,7 @@ def agtp_n2o(
     Parameters
     ----------
     emission_year : int
-        Year of emission (2030-2100, clamped if outside)
+        Year of emission (2020-2150, clamped if outside)
     time_horizon : int
         Integration period in years
     time_varying_re : bool

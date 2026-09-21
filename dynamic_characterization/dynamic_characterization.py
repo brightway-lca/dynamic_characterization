@@ -735,7 +735,8 @@ def _characterize_prospective_radiative_forcing(
     """
     Calculate prospective radiative forcing using Watanabe et al. (2026) characterization.
 
-    For GHGs available in Watanabe (CO2, CH4, N2O), uses scenario-based radiative efficiencies.
+    For GHGs available in Watanabe (CO2, CH4, N2O), uses scenario-based radiative
+    efficiencies; for CO2 the impulse response function is scenario-based as well.
     For other GHGs (when fallback_to_ipcc=True), uses standard IPCC AR6 functions.
     """
     return _apply_characterization_function(
