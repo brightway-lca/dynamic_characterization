@@ -8,6 +8,9 @@ time (see the note at the top of `test_characterize_prospective_fallback.py`).
 A module that imports the real package must be collected before that happens.
 """
 
+import warnings
+
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -21,6 +24,8 @@ from dynamic_characterization.prospective import (
 from dynamic_characterization.prospective.radiative_forcing import (
     characterize_ch4 as prospective_characterize_ch4,
     characterize_co2 as prospective_characterize_co2,
+    _get_year_index,
+    _reset_bound_warnings,
 )
 
 IMAGE = {"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"}
@@ -37,8 +42,10 @@ CH4_FLOW = 2
 @pytest.fixture(autouse=True)
 def clean_scenario():
     reset_scenario()
+    _reset_bound_warnings()
     yield
     reset_scenario()
+    _reset_bound_warnings()
 
 
 def test_context_applies_scenario_inside_block():
@@ -164,3 +171,23 @@ def test_prospective_metric_without_any_scenario_still_raises():
             metric="pGWP",
             characterization_functions=_co2_functions(),
         )
+
+
+def test_out_of_bounds_year_warns_once_per_bound():
+    years = np.arange(2020, 2151)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for _ in range(50):
+            _get_year_index(1990, years)
+    assert len(caught) == 1
+    assert "clamping to 2020" in str(caught[0].message)
+
+
+def test_both_bounds_warn_separately():
+    years = np.arange(2020, 2151)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for _ in range(10):
+            _get_year_index(1990, years)
+            _get_year_index(2200, years)
+    assert len(caught) == 2
