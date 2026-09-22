@@ -191,3 +191,36 @@ def test_both_bounds_warn_separately():
             _get_year_index(1990, years)
             _get_year_index(2200, years)
     assert len(caught) == 2
+
+
+def test_characterize_warns_on_each_call_not_just_the_first():
+    """Regression test: `_WARNED_BOUNDS` used to be module-global and never
+    reset between `characterize()` calls, so in a multi-call sweep (e.g. one
+    `characterize()` per row of a `TimexLCA.compare()`) only the first call
+    ever warned about a clamped out-of-bounds emission year - later calls
+    with the same out-of-bounds year clamped silently. `characterize()` now
+    resets the dedup set at the start of its scoped body (see
+    `_reset_bound_warnings`'s call site in
+    `dynamic_characterization.dynamic_characterization.characterize`), so
+    the dedup scope is "once per bound per call", not "once per bound per
+    process".
+    """
+    early_inventory = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["1990-01-01"]),
+            "amount": [1.0],
+            "flow": [CO2_FLOW],
+            "activity": [0],
+        }
+    )
+    for _ in range(2):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            characterize(
+                early_inventory,
+                metric="prospective_radiative_forcing",
+                characterization_functions=_co2_functions(),
+                scenario=IMAGE,
+            )
+        clamp_warnings = [w for w in caught if "clamping" in str(w.message)]
+        assert len(clamp_warnings) == 1

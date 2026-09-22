@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.5.0] - (2026-09-22)
 * Added `characterize(scenario=...)`, which applies a prospective scenario for that call only, so several scenarios can be used in one process without a module-global `set_scenario()` call in between.
 * Added `prospective.scenario_context()`, a context manager that applies a scenario for the duration of a block and restores the previous one on exit, including when the block raises. `characterize(scenario=...)` is built on it.
-* Changed out-of-bounds emission years to warn once per clamped bound instead of once per row, so characterizing a full dynamic inventory no longer emits thousands of identical warnings.
+* Changed out-of-bounds emission years to warn once per clamped bound per `characterize()` call instead of once per row, so characterizing a full dynamic inventory no longer emits thousands of identical warnings; a later `characterize()` call (e.g. the next row of a sweep) still warns on its own out-of-bounds years rather than staying silent because an earlier call already warned.
 
 ## [1.4.3] - (2026-08-21)
 * Fixed prospective RF being constrained to after 2030 even if earlier data exists

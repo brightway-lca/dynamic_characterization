@@ -49,7 +49,14 @@ _WARNED_BOUNDS: set = set()
 
 
 def _reset_bound_warnings() -> None:
-    """Forget which bounds have been warned about. Used by the tests."""
+    """Forget which bounds have been warned about.
+
+    Called by `dynamic_characterization.characterize` at the start of each
+    call, so the "once per bound" dedup is scoped to a single call rather
+    than to the whole process - otherwise only the first call in a sweep
+    (e.g. one `characterize()` per row of a `compare()`) would ever warn.
+    Also used directly by the tests to reset state between cases.
+    """
     _WARNED_BOUNDS.clear()
 
 
