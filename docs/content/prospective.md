@@ -49,12 +49,27 @@ Each IAM comes with exactly one SSP. The full list is also available at runtime 
 
 ### Setting a Scenario
 
-You **must** set a scenario before using pGWP or pGTP metrics:
+You **must** choose a scenario before using pGWP or pGTP metrics. The simplest way is
+per call, which is also what lets one process use several scenarios:
+
+```python
+from dynamic_characterization import characterize
+
+df_pgwp = characterize(
+    dynamic_inventory_df,
+    metric="pGWP",
+    base_lcia_method=method,
+    scenario={"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"},
+)
+```
+
+If every call in the session uses the same scenario, set it once instead and drop the
+`scenario` argument:
 
 ```python
 import dynamic_characterization.prospective as prospective
 
-# Set scenario - this is required before using pGWP or pGTP
+# Set scenario - this is required before using pGWP or pGTP, unless passed per call
 prospective.set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
 
 # Check current scenario
@@ -77,19 +92,18 @@ The choice of scenario should align with your study's assumptions about future c
 
 ### Basic Usage
 
+Pass the scenario directly to `characterize()`:
+
 ```python
-import dynamic_characterization.prospective as prospective
 from dynamic_characterization import characterize
 
-# 1. Set the scenario first
-prospective.set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
-
-# 2. Characterize with prospective radiative forcing (W/m² time series)
+# Characterize with prospective radiative forcing (W/m² time series)
 df_prf = characterize(
     dynamic_inventory_df,
     metric="prospective_radiative_forcing",
     base_lcia_method=method,
     time_horizon=100,
+    scenario={"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"},
 )
 
 # Or use prospective GWP (kg CO2eq)
@@ -98,12 +112,30 @@ df_pgwp = characterize(
     metric="pGWP",
     base_lcia_method=method,
     time_horizon=100,
+    scenario={"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"},
 )
 
 # Or use prospective GTP (kg CO2eq)
 df_pgtp = characterize(
     dynamic_inventory_df,
     metric="pGTP",
+    base_lcia_method=method,
+    time_horizon=100,
+    scenario={"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"},
+)
+```
+
+Or, if every call in the session uses the same scenario, set it once for the session
+instead and drop the `scenario` argument from each call:
+
+```python
+import dynamic_characterization.prospective as prospective
+
+prospective.set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
+
+df_prf = characterize(
+    dynamic_inventory_df,
+    metric="prospective_radiative_forcing",
     base_lcia_method=method,
     time_horizon=100,
 )

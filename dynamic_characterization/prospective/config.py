@@ -42,12 +42,17 @@ NO_SCENARIO_MESSAGE = """No scenario set.
 
 The prospective characterization factors (Watanabe et al. 2026) used for the metrics
 "pGWP", "pGTP" and "prospective_radiative_forcing" depend on a future scenario, so you
-have to choose one before calculating them:
+have to choose one before calculating them. Either per call:
+
+    characterize(..., scenario={"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"})
+
+or once for the whole session:
 
     from dynamic_characterization.prospective import set_scenario
     set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
 
-This is done once per Python session and applies to all following calculations.
+If you are calling this through bw_timex, the scenario normally comes from the
+background scenario of your TimexLCA - see bw_timex.available_scenarios().
 
 Each IAM comes with one SSP: IMAGE-SSP1, MESSAGE-SSP2, AIM-SSP3, GCAM4-SSP4,
 REMIND-SSP5. The available RCPs are "2.6", "4.5", "6.0" and "8.5", but not for every

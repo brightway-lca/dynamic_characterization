@@ -6,7 +6,10 @@ Provides:
 - prospective: Prospective characterization factors from Watanabe et al. (2026)
 - original_temporalis_functions: Legacy functions from bw_temporalis
 
-For prospective metrics (pGWP, pGTP), set the scenario first:
+For prospective metrics (pGWP, pGTP), choose a scenario. Per call:
+    characterize(..., metric="pGWP", scenario={"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"})
+
+Or once for the session:
     import dynamic_characterization.prospective as prospective
     prospective.set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
 """
