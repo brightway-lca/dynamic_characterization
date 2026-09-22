@@ -1,5 +1,6 @@
 """Scenario configuration for prospective characterization factors."""
 
+from contextlib import contextmanager
 from typing import Dict, Optional, Set, Tuple
 
 # Valid IAM-SSP-RCP combinations from the paper
@@ -106,3 +107,36 @@ def reset_scenario() -> None:
     """Reset scenario to None (for testing)."""
     global _current_scenario
     _current_scenario = None
+
+
+@contextmanager
+def scenario_context(scenario: Optional[Dict[str, str]]):
+    """
+    Apply a scenario for the duration of a block, then restore what was set before.
+
+    Parameters
+    ----------
+    scenario : dict or None
+        Scenario with keys `iam`, `ssp`, `rcp`, validated like `set_scenario`.
+        `None` is a no-op, so callers can pass an optional scenario straight
+        through without branching.
+
+    Notes
+    -----
+    This overrides module-level state, so it is not thread-safe: two threads
+    characterizing under different scenarios at the same time will interfere.
+    The module's scenario has always been process-wide; this only narrows when
+    a given value applies.
+    """
+    global _current_scenario
+
+    if scenario is None:
+        yield
+        return
+
+    previous = _current_scenario
+    set_scenario(**scenario)
+    try:
+        yield
+    finally:
+        _current_scenario = previous

@@ -15,6 +15,7 @@ from .config import (
     VALID_SCENARIOS,
     get_scenario,
     reset_scenario,
+    scenario_context,
     set_scenario,
 )
 from .data_loader import (
@@ -38,6 +39,7 @@ __all__ = [
     "VALID_SCENARIOS",
     "get_scenario",
     "reset_scenario",
+    "scenario_context",
     "set_scenario",
     "load_irf_ch4",
     "load_irf_co2",

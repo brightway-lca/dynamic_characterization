@@ -22,7 +22,7 @@ from dynamic_characterization.ipcc_ar6.radiative_forcing import (
     characterize_n2o,
     create_generic_characterization_function,
 )
-from dynamic_characterization.prospective import agwp, agtp
+from dynamic_characterization.prospective import agwp, agtp, scenario_context
 from dynamic_characterization.prospective.radiative_forcing import (
     characterize_ch4 as prospective_characterize_ch4,
     characterize_co2 as prospective_characterize_co2,
@@ -63,6 +63,7 @@ def characterize(
     time_varying_re: bool = False,
     fallback_to_ipcc: bool = True,
     characterize_biogenic_uptake: bool = True,
+    scenario: Dict[str, str] = None,
 ) -> pd.DataFrame:
     """
     Characterizes the dynamic inventory, formatted as a Dataframe, by evaluating each emission (row in DataFrame) using given dynamic characterization functions.
@@ -115,12 +116,49 @@ def characterize(
         Whether to characterize biogenic uptake flows (e.g. CO2 uptake by soil or biomass, or CDR processes).
         If True, the default characterization functions include uptake flows and these are characterized with a negative emission profile. Default is True.
         Set to False if you want to explicitly model uptake outside of the dynamic characterization (e.g. from a forest model)
-        
+    scenario : dict, optional
+        Prospective scenario for this call only, with keys `iam`, `ssp` and
+        `rcp`, e.g. `{"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"}`. Applies for
+        the duration of the call and is then restored, so different calls in one
+        process can use different scenarios. Only affects the prospective
+        metrics. Default is None, which uses whatever
+        `dynamic_characterization.prospective.set_scenario()` last set.
+
     Returns
     -------
     pd.DataFrame
         characterized dynamic inventory
     """
+    with scenario_context(scenario):
+        return _characterize(
+            dynamic_inventory_df=dynamic_inventory_df,
+            metric=metric,
+            characterization_functions=characterization_functions,
+            base_lcia_method=base_lcia_method,
+            time_horizon=time_horizon,
+            fixed_time_horizon=fixed_time_horizon,
+            time_horizon_start=time_horizon_start,
+            characterization_function_co2=characterization_function_co2,
+            time_varying_re=time_varying_re,
+            fallback_to_ipcc=fallback_to_ipcc,
+            characterize_biogenic_uptake=characterize_biogenic_uptake,
+        )
+
+
+def _characterize(
+    dynamic_inventory_df: pd.DataFrame,
+    metric: str = "radiative_forcing",
+    characterization_functions: Dict[int, Callable] = None,
+    base_lcia_method: Tuple[str, ...] = None,
+    time_horizon: int = 100,
+    fixed_time_horizon: bool = False,
+    time_horizon_start: datetime = datetime.now(),
+    characterization_function_co2: Callable = None,
+    time_varying_re: bool = False,
+    fallback_to_ipcc: bool = True,
+    characterize_biogenic_uptake: bool = True,
+) -> pd.DataFrame:
+    """The body of `characterize`, run inside its scenario scoping."""
 
     valid_metrics = {"radiative_forcing", "GWP", "pGWP", "pGTP", "prospective_radiative_forcing"}
     if metric not in valid_metrics:
