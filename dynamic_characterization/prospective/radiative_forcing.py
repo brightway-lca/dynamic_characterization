@@ -43,6 +43,22 @@ CONST_CO2 = 1.0 / PPB_TO_KG_CO2  # ppb/kg (to convert RE from per-ppb to per-kg)
 CONST_CH4 = 1.0 / PPB_TO_KG_CH4  # ppb/kg
 CONST_N2O = 1.0 / PPB_TO_KG_N2O  # ppb/kg
 
+# Bounds already warned about, so characterizing a large inventory does not emit
+# one identical warning per row. Keyed on (bound_year, direction).
+_WARNED_BOUNDS: set = set()
+
+
+def _reset_bound_warnings() -> None:
+    """Forget which bounds have been warned about.
+
+    Called by `dynamic_characterization.characterize` at the start of each
+    call, so the "once per bound" dedup is scoped to a single call rather
+    than to the whole process - otherwise only the first call in a sweep
+    (e.g. one `characterize()` per row of a `compare()`) would ever warn.
+    Also used directly by the tests to reset state between cases.
+    """
+    _WARNED_BOUNDS.clear()
+
 
 def _get_year_index(emission_year: int, years: np.ndarray) -> int:
     """
@@ -50,21 +66,30 @@ def _get_year_index(emission_year: int, years: np.ndarray) -> int:
 
     The bounds are taken from the RE data itself (currently 2020-2150), so they
     follow the data instead of the narrower range reported in the paper tables.
+
+    Each bound is warned about once per process: a dynamic inventory can hold
+    many thousands of rows outside the data range, and one warning per row
+    drowns everything else.
     """
     min_year, max_year = int(years[0]), int(years[-1])
 
     if emission_year < min_year:
-        warnings.warn(
-            f"Emission year {emission_year} < {min_year}, clamping to {min_year}"
-        )
+        if ("below", min_year) not in _WARNED_BOUNDS:
+            _WARNED_BOUNDS.add(("below", min_year))
+            warnings.warn(
+                f"Emission year {emission_year} < {min_year}, clamping to {min_year}. "
+                "Further emissions before this bound are clamped without warning."
+            )
         emission_year = min_year
     elif emission_year > max_year:
-        warnings.warn(
-            f"Emission year {emission_year} > {max_year}, clamping to {max_year}"
-        )
+        if ("above", max_year) not in _WARNED_BOUNDS:
+            _WARNED_BOUNDS.add(("above", max_year))
+            warnings.warn(
+                f"Emission year {emission_year} > {max_year}, clamping to {max_year}. "
+                "Further emissions after this bound are clamped without warning."
+            )
         emission_year = max_year
 
-    # Find index in years array
     idx = np.searchsorted(years, emission_year)
     return idx
 

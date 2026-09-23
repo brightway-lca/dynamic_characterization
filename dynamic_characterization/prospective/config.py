@@ -1,5 +1,6 @@
 """Scenario configuration for prospective characterization factors."""
 
+from contextlib import contextmanager
 from typing import Dict, Optional, Set, Tuple
 
 # Valid IAM-SSP-RCP combinations from the paper
@@ -41,12 +42,17 @@ NO_SCENARIO_MESSAGE = """No scenario set.
 
 The prospective characterization factors (Watanabe et al. 2026) used for the metrics
 "pGWP", "pGTP" and "prospective_radiative_forcing" depend on a future scenario, so you
-have to choose one before calculating them:
+have to choose one before calculating them. Either per call:
+
+    characterize(..., scenario={"iam": "IMAGE", "ssp": "SSP1", "rcp": "2.6"})
+
+or once for the whole session:
 
     from dynamic_characterization.prospective import set_scenario
     set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
 
-This is done once per Python session and applies to all following calculations.
+If you are calling this through bw_timex, the scenario normally comes from the
+background scenario of your TimexLCA - see bw_timex.available_scenarios().
 
 Each IAM comes with one SSP: IMAGE-SSP1, MESSAGE-SSP2, AIM-SSP3, GCAM4-SSP4,
 REMIND-SSP5. The available RCPs are "2.6", "4.5", "6.0" and "8.5", but not for every
@@ -106,3 +112,36 @@ def reset_scenario() -> None:
     """Reset scenario to None (for testing)."""
     global _current_scenario
     _current_scenario = None
+
+
+@contextmanager
+def scenario_context(scenario: Optional[Dict[str, str]]):
+    """
+    Apply a scenario for the duration of a block, then restore what was set before.
+
+    Parameters
+    ----------
+    scenario : dict or None
+        Scenario with keys `iam`, `ssp`, `rcp`, validated like `set_scenario`.
+        `None` is a no-op, so callers can pass an optional scenario straight
+        through without branching.
+
+    Notes
+    -----
+    This overrides module-level state, so it is not thread-safe: two threads
+    characterizing under different scenarios at the same time will interfere.
+    The module's scenario has always been process-wide; this only narrows when
+    a given value applies.
+    """
+    global _current_scenario
+
+    if scenario is None:
+        yield
+        return
+
+    previous = _current_scenario
+    set_scenario(**scenario)
+    try:
+        yield
+    finally:
+        _current_scenario = previous
