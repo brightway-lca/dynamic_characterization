@@ -190,7 +190,7 @@ PRECURSOR_SPECIES = ("CO", "VOC", "H2", "NOx", "nitrate")
 @lru_cache(maxsize=None)
 def load_precursor_parameters() -> dict:
     """The published precursor parameter sets in ``data/precursor_parameters.json``."""
-    with open(os.path.join(_DATA_DIR, "precursor_parameters.json")) as f:
+    with open(os.path.join(_DATA_DIR, "precursor_parameters.json"), encoding="utf-8") as f:
         return json.load(f)
 
 
