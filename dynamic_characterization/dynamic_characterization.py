@@ -704,15 +704,14 @@ def _characterize_pgtp(
             time_varying_re=time_varying_re,
         )
     else:
-        # For other GHGs, fall back to using integrated RF as proxy
-        # This may not be as accurate but provides a fallback
-        radiative_forcing_ghg = _apply_characterization_function(
+        # GHGs outside the Watanabe module (IPCC AR6 fallback functions): AGTP from the
+        # function's radiative forcing, convolved with the same temperature response
+        agtp_gas = _agtp_from_radiative_forcing(
             char_func,
             row,
             dynamic_time_horizon,
             time_varying_re=time_varying_re,
         )
-        agtp_gas = radiative_forcing_ghg.amount.sum()
 
     # Calculate reference AGTP for 1 kg of CO2
     agtp_co2 = agtp.agtp_co2(
@@ -729,6 +728,44 @@ def _characterize_pgtp(
         flow=row.flow,
         activity=row.activity,
     )
+
+
+def _agtp_from_radiative_forcing(
+    char_func,
+    row,
+    time_horizon: int,
+    time_varying_re: bool = False,
+) -> float:
+    """
+    AGTP at ``time_horizon`` [K per unit emission] from a characterization function's RF.
+
+    Used for pGTP of GHGs that the Watanabe module does not cover. If the function provides
+    its own ``agtp(time_horizon)``, that is used. Otherwise the function is evaluated for a
+    unit emission and its annual forcing is convolved with the temperature response of
+    ``prospective.agtp`` (the same model and discretisation as ``agtp.agtp_co2``, so that the
+    pGTP ratio is consistent).
+
+    Assumes the convention of the IPCC AR6 functions in this package: element ``k`` of the
+    marginal forcing is the forcing integrated over year ``[k-1, k]`` (element 0 is zero).
+    """
+    if time_horizon <= 0:
+        return 0.0
+
+    own_agtp = getattr(char_func, "agtp", None)
+    if callable(own_agtp):
+        return float(own_agtp(time_horizon))
+
+    marginal = np.asarray(
+        _apply_characterization_function(
+            char_func,
+            row._replace(amount=1),
+            time_horizon + 1,
+            time_varying_re=time_varying_re,
+        ).amount,
+        dtype="float64",
+    )
+    years = np.arange(1, len(marginal))  # end of each forcing year
+    return float(np.sum(marginal[1:] * agtp._temperature_response(time_horizon - years)))
 
 
 def _characterize_prospective_radiative_forcing(
