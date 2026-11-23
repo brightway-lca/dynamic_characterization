@@ -15,6 +15,8 @@ __all__ = (
     "__version__",
     "characterize",
     "create_characterization_functions_from_method",
+    "compare_with_static",
+    "CharacterizationOptions",
     "original_temporalis_functions",
     "ipcc_ar6",
     "prospective",
@@ -25,5 +27,7 @@ __version__ = "1.4.3"
 from . import ipcc_ar6, original_temporalis_functions, prospective
 from .dynamic_characterization import (
     characterize,
+    compare_with_static,
     create_characterization_functions_from_method,
 )
+from .options import CharacterizationOptions
