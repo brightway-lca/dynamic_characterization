@@ -244,6 +244,56 @@ pgtp_ch4 = agtp_ch4 / agtp_co2
 print(f"pGTP100 CH4: {pgtp_ch4:.1f}")  # ~3-6 depending on scenario
 ```
 
+## With the AR6 parameter set
+
+The prospective functions above cover the direct forcing of CO2, CH4 and N2O. With
+`characterization_options={"parameter_set": "ar6"}`, the prospective metrics use the AR6
+pulse responses of the `"ar6"` set instead (see [Usage](usage.md)), evaluated with the scenario
+for the year of each emission:
+
+```python
+set_scenario(iam="MESSAGE", ssp="SSP2", rcp="4.5")
+
+characterize(
+    dynamic_inventory_df,
+    metric="pGWP",  # or "pGTP", "prospective_radiative_forcing"
+    base_lcia_method=method,
+    characterization_options={"parameter_set": "ar6"},
+)
+```
+
+- **CO2**, and every CO2 term of other gases (oxidation CO2 of fossil CH4 and CO, CO2 uptake, the
+  CO2 of the climate–carbon feedback), follows the scenario CO2 radiative efficiency and impulse
+  response.
+- **CH4 and N2O** use the scenario's direct radiative efficiencies with the AR6 tropospheric
+  adjustments (CH4 −14 %, N2O +7 %) and indirect terms (ozone, stratospheric water vapour, the
+  CH4 effect of N2O), plus the climate–carbon feedback.
+- **All other gases** (halocarbons, CO, VOC, H2, optionally NOx) keep their AR6 or literature
+  forcing; only their CO2 terms and the CO2 reference change.
+- The temperature response (pGTP) is the AR6 one for the gas and the CO2 reference alike.
+- The annual forcing adds up to AGWP(H), as everywhere in the `"ar6"` set, and the CO2
+  reference of pGWP and pGTP is computed the same way.
+
+Examples, pGWP100 per kg emitted in 2030 / 2070:
+
+| scenario | CH4, fossil | N2O | CF4 | H2 |
+|---|---|---|---|---|
+| IMAGE-SSP1-2.6 | 29.0 / 34.5 | 285 / 291 | 7323 / 7921 | 11.3 / 12.3 |
+| MESSAGE-SSP2-4.5 | 27.5 / 35.0 | 278 / 322 | 7098 / 8751 | 10.9 / 13.6 |
+| REMIND-SSP5-8.5 | 25.4 / 34.3 | 260 / 392 | 6622 / 10213 | 10.2 / 16.0 |
+| AR6 (no scenario) | 29.8 | 273 | 7380 | 11.4 |
+
+Limitations:
+
+- Time horizons up to 100 years (the length of the scenario CO2 impulse response); longer ones
+  raise an error.
+- `time_varying_re=True` is not supported; the radiative efficiencies of the emission year are
+  used for the whole response.
+- The values are not those of the Watanabe & Cherubini (2026) SI tables: the paper's CH4 and N2O
+  values could not be reproduced from the module's radiative efficiencies with an AR6-style
+  treatment of the indirect effects (deviations of 5–10 % that vary by scenario and year), so the
+  `"ar6"` set applies the AR6 recipe to the scenario inputs instead.
+
 ## Reference
 
 Watanabe, K., Nansai, K., Nakajima, K., & Gibon, T. (2015). **Prospective Characterization Factors for Assessing Climate Change Impacts in Life Cycle Assessments**. *Environmental Science & Technology*, 49(5), 2811-2819. https://doi.org/10.1021/acs.est.5b01118

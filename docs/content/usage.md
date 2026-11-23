@@ -130,7 +130,8 @@ Options (all are keys of `characterization_options`; see `CharacterizationOption
 static factor and the dynamic GWP of every flow of a method.
 
 Without `characterization_options`, a `FutureWarning` announces that the default will change to
-`"ar6"` in version 2.0. The `"ar6"` set is not yet available for the prospective metrics.
+`"ar6"` in version 2.0. With the prospective metrics, the `"ar6"` set follows the chosen
+scenario; see [Prospective Characterization](prospective.md#with-the-ar6-parameter-set).
 
 ### Indirect gases (CO, VOC, H2, NOx)
 

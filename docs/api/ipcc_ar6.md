@@ -26,4 +26,6 @@ Pulse responses behind `characterization_options={"parameter_set": "ar6"}`.
 
 ::: dynamic_characterization.ar6_dispatch
 
+::: dynamic_characterization.ar6_prospective
+
 ::: dynamic_characterization.flows

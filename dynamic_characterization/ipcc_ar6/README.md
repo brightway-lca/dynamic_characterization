@@ -51,3 +51,15 @@ the tests reproduce.
 - Short-lived components (short-term O3, sulfate, nitrate) use tau_O3 = 0.267 yr of Fuglestvedt et
   al. 2010 (status `fallback` where the source treats them as instantaneous); at annual
   resolution this only moves forcing within the first year.
+
+### With a prospective scenario
+
+`ar6_core` evaluates every `CO2Release` component (emitted CO2, uptake, oxidation CO2) and the
+CO2 of the climate–carbon feedback either with the AR6 impulse response (analytic) or with a
+`TabulatedCO2Response` (annual RF of 1 kg CO2, interpolated linearly, numerical convolution on
+the 0.1-yr grid; AGTP with the AR6 temperature response integrated exactly over each step).
+`dynamic_characterization/ar6_prospective.py` builds that response from the Watanabe et al.
+(2026) scenario data (CO2 radiative efficiency of the emission year x RCP impulse response) and
+gives CH4 and N2O the scenario radiative efficiencies, with the AR6 adjustments
+(`tropospheric_adjustment` in `ar6_parameters.json`). With the AR6 CO2 response sampled annually,
+the tabulated path reproduces the analytic results within 0.05 %.
