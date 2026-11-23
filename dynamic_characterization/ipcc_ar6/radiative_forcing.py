@@ -5,6 +5,8 @@ import pandas as pd
 
 from dynamic_characterization.classes import CharacterizedRow
 
+from . import ar6_core, gases
+
 
 def IRF_co2(year) -> callable:
     """
@@ -468,3 +470,65 @@ def create_generic_characterization_function(decay_series) -> CharacterizedRow:
         )
 
     return characterize_generic
+
+
+# --- "ar6" parameter set ---------------------------------------------------------------------
+
+
+@lru_cache(maxsize=None)
+def make_characterization_function(spec):
+    """
+    Characterization function for a pulse response from ``ar6_core`` (a ``GasSpec``).
+
+    The returned function has the same signature and output as the legacy functions in this
+    module, ``(series, period=100, cumulative=False) -> CharacterizedRow``, with one
+    difference in the time convention: the value stamped at ``date + k`` years is the forcing
+    integrated over the year *starting* then, so the annual values add up to ``AGWP(period)``
+    (the legacy functions add up to ``AGWP(period - 1)``).
+
+    The function also exposes ``.spec``, ``.agwp(time_horizon)`` and ``.agtp(time_horizon)``
+    (per kg). It is memoized per spec, so the same spec always gives the same function object.
+    """
+    def characterize_ar6(series, period: int = 100, cumulative: bool = False) -> CharacterizedRow:
+        date_beginning: np.datetime64 = series.date.to_numpy()
+        dates_characterized: np.ndarray = date_beginning + np.arange(
+            start=0, stop=period, dtype="timedelta64[Y]"
+        ).astype("timedelta64[s]")
+
+        forcing = np.array(series.amount * ar6_core.annual_cumulative(spec, period), dtype="float64")
+        if not cumulative:
+            forcing = np.diff(forcing, prepend=0)
+
+        return CharacterizedRow(
+            date=np.array(dates_characterized, dtype="datetime64[s]"),
+            amount=forcing,
+            flow=series.flow,
+            activity=series.activity,
+        )
+
+    characterize_ar6.__name__ = f"characterize_ar6[{spec.name}]"
+    characterize_ar6.__qualname__ = characterize_ar6.__name__
+    characterize_ar6.spec = spec
+    characterize_ar6.agwp = lambda time_horizon: float(ar6_core.agwp(spec, float(time_horizon)))
+    characterize_ar6.agtp = lambda time_horizon: float(ar6_core.agtp(spec, float(time_horizon)))
+    return characterize_ar6
+
+
+def _co2_ar6_function():
+    return make_characterization_function(gases.co2())
+
+
+def characterize_co2_ar6(series, period: int = 100, cumulative: bool = False) -> CharacterizedRow:
+    """
+    Radiative forcing of CO2 with the ``"ar6"`` parameter set (AR6 Table 7.SM.7 CO2 response).
+
+    Differs from :func:`characterize_co2` only in the radiative efficiency (Meinshausen et al.
+    2020 at 2019 concentrations, +5 % adjustment) and in the time convention: the annual values
+    add up to ``AGWP(period)``. Used as the GWP reference of the ``"ar6"`` parameter set.
+    """
+    return _co2_ar6_function()(series, period, cumulative=cumulative)
+
+
+def characterize_co2_uptake_ar6(series, period: int = 100, cumulative: bool = False) -> CharacterizedRow:
+    """As :func:`characterize_co2_ar6`, with a negative sign for CO2 uptake."""
+    return make_characterization_function(gases.co2_uptake())(series, period, cumulative=cumulative)
