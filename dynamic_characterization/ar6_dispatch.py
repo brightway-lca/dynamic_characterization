@@ -116,11 +116,11 @@ def function_for(
 
     if species is None:
         return None
-    method, paper_code = options.prospective_method, options.prospective_paper_code
+    method = options.prospective_method
     if species == "CO2":
-        return ar6_prospective.co2_function(method, paper_code) if prospective else characterize_co2_ar6
+        return ar6_prospective.co2_function(method) if prospective else characterize_co2_ar6
     if species == "CO2 uptake":
-        return ar6_prospective.co2_function(method, paper_code, uptake=True) if prospective else characterize_co2_uptake_ar6
+        return ar6_prospective.co2_function(method, uptake=True) if prospective else characterize_co2_uptake_ar6
     if prospective and method == "watanabe2026" and species in ("CH4", "N2O"):
         if species == "CH4" and origin is None:
             logger.warning(
@@ -128,7 +128,7 @@ def function_for(
                 "(2026) CH4 metric does not distinguish them.",
                 flow_label,
             )
-        return ar6_prospective.paper_function(species, paper_code)
+        return ar6_prospective.paper_function(species)
     if species == "CH4":
         if origin is None:
             origin = options.unspecified_origin
@@ -190,7 +190,7 @@ def function_for(
         if spec is None:
             return None
     if prospective:
-        return ar6_prospective.fixed(spec, method=method, paper_code=paper_code)
+        return ar6_prospective.fixed(spec, method=method)
     return make_characterization_function(spec)
 
 

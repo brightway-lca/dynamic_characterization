@@ -1,7 +1,7 @@
 """
-Reproduction of Barbosa Watanabe & Cherubini (2026), doi:10.1021/acs.est.5c12391:
-``prospective.watanabe2026`` and the default "watanabe2026" method of the "ar6" parameter set
-with the prospective metrics.
+Barbosa Watanabe & Cherubini (2026), doi:10.1021/acs.est.5c12391, with two errors of the
+published code corrected: ``prospective.watanabe2026`` and the default "watanabe2026" method of
+the "ar6" parameter set with the prospective metrics.
 
 Imports must stay at module level and this module must sort before test_prospective.py, which
 replaces `dynamic_characterization` in sys.modules when it is collected.
@@ -23,7 +23,9 @@ from dynamic_characterization.dynamic_characterization import (
     create_characterization_functions_from_method,
 )
 from dynamic_characterization.ipcc_ar6 import ar6_core, gases
+from dynamic_characterization.options import CharacterizationOptions
 from dynamic_characterization.prospective import set_scenario, watanabe2026
+from dynamic_characterization.prospective.data_loader import load_irf_co2, load_re_co2
 
 DATA = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dynamic_characterization", "prospective", "data"
@@ -45,58 +47,53 @@ def _si_table(number):
     return cells
 
 
-@pytest.mark.parametrize(
-    "number, gas, metric",
-    [("001", "CH4", "pgtp"), ("002", "N2O", "pgtp"), ("003", "CH4", "pgwp"), ("004", "N2O", "pgwp")],
-)
-def test_si_tables_100_year_horizon(number, gas, metric):
-    """Every cell of es5c12391_si_001-004.xlsx (18 scenarios x 2030-2050)."""
-    cells = _si_table(number)
-    assert len(cells) == 378
-    deviations = [abs(getattr(watanabe2026, metric)(gas, year, 100, *scenario) - value) for scenario, year, value in cells]
-    assert max(deviations) <= TOLERANCE
+UNAFFECTED = {("GCAM4", "SSP4"), ("MESSAGE", "SSP2"), ("REMIND", "SSP5")}  # all four RCPs: CO2 IRF selection unaffected
 
 
-# SI Tables S.4, S.5, S.8 and S.9 (in es5c12391_si_028.pdf only): GWP20 and GTP50
-PDF_TABLES = [
-    # gas, metric, horizon, scenario, {year: value}
-    ("CH4", "pgwp", 20, ("AIM", "SSP3", "4.5"), {2030: 91.1, 2040: 95.9, 2050: 102.3}),
-    ("CH4", "pgwp", 20, ("IMAGE", "SSP1", "8.5"), {2030: 92.7, 2040: 98.0, 2050: 103.8}),
-    ("CH4", "pgwp", 20, ("MESSAGE", "SSP2", "2.6"), {2030: 92.0, 2040: 97.0, 2050: 102.1}),
-    ("N2O", "pgwp", 20, ("AIM", "SSP3", "4.5"), {2030: 280.8, 2040: 297.1, 2050: 308.7}),
-    ("N2O", "pgwp", 20, ("IMAGE", "SSP1", "8.5"), {2030: 278.1, 2040: 292.3, 2050: 306.3}),
-    ("N2O", "pgwp", 20, ("MESSAGE", "SSP2", "2.6"), {2030: 273.1, 2040: 279.3, 2050: 280.4}),
-    ("CH4", "pgtp", 50, ("AIM", "SSP3", "4.5"), {2030: 10.5, 2040: 11.0, 2050: 11.7}),
-    ("CH4", "pgtp", 50, ("IMAGE", "SSP1", "8.5"), {2030: 10.7, 2040: 11.3, 2050: 11.9}),
-    ("CH4", "pgtp", 50, ("MESSAGE", "SSP2", "2.6"), {2030: 10.6, 2040: 11.2, 2050: 11.7}),
-    ("N2O", "pgtp", 50, ("AIM", "SSP3", "4.5"), {2030: 285.6, 2040: 301.1, 2050: 311.8}),
-    ("N2O", "pgtp", 50, ("IMAGE", "SSP1", "8.5"), {2030: 282.9, 2040: 296.4, 2050: 309.5}),
-    ("N2O", "pgtp", 50, ("MESSAGE", "SSP2", "2.6"), {2030: 278.1, 2040: 283.7, 2050: 284.4}),
-]
+def test_matches_the_si_tables_where_the_corrections_do_not_apply():
+    """
+    N2O pGTP (Code #9) has no feedback-box error, and GCAM4, MESSAGE and REMIND are not affected
+    by the CO2 impulse-response selection: there the corrected port equals the SI table
+    (es5c12391_si_002.xlsx), cell by cell.
+    """
+    cells = [(sc, year, value) for sc, year, value in _si_table("002") if sc[:2] in UNAFFECTED]
+    assert len(cells) == 12 * 21
+    for scenario, year, value in cells:
+        assert watanabe2026.pgtp("N2O", year, 100, *scenario) == pytest.approx(value, abs=TOLERANCE)
 
 
-@pytest.mark.parametrize("gas, metric, horizon, scenario, values", PDF_TABLES)
-def test_si_tables_other_horizons(gas, metric, horizon, scenario, values):
-    for year, value in values.items():
-        assert getattr(watanabe2026, metric)(gas, year, horizon, *scenario) == pytest.approx(value, abs=TOLERANCE)
+@pytest.mark.parametrize("year, value", [(2030, 278.1), (2040, 283.7), (2050, 284.4)])
+def test_matches_si_table_s9_where_the_corrections_do_not_apply(year, value):
+    """N2O pGTP50, MESSAGE-SSP2-2.6 (SI Table S.9)."""
+    assert watanabe2026.pgtp("N2O", year, 50, "MESSAGE", "SSP2", "2.6") == pytest.approx(value, abs=TOLERANCE)
 
 
-def test_co2_irf_selection_of_the_paper_code():
-    """The paper's code picks the CO2 impulse response by the scenario's position."""
-    assert watanabe2026.co2_irf_key("MESSAGE", "SSP2", "8.5") == "RCP85"
-    assert watanabe2026.co2_irf_key("IMAGE", "SSP1", "8.5") == "RCP60"
-    assert watanabe2026.co2_irf_key("AIM", "SSP3", "4.5") == "RCP26"
-    assert watanabe2026.co2_irf_key("IMAGE", "SSP1", "8.5", paper_code=False) == "RCP85"
+@pytest.mark.parametrize("number, metric", [("003", "pgwp"), ("001", "pgtp")])
+def test_corrected_feedback_raises_ch4_above_the_si_tables(number, metric):
+    """
+    In the published CH4 code, boxes 2 and 3 decay from box 1 (lifetime 2.4 yr), which loses most
+    of the slow feedback CO2. Corrected, CH4 pGWP100 and pGTP100 are higher than the tables in
+    every scenario that the CO2 impulse-response selection does not affect.
+    """
+    cells = [(sc, year, value) for sc, year, value in _si_table(number) if sc[:2] in UNAFFECTED]
+    ratios = [getattr(watanabe2026, metric)("CH4", year, 100, *sc) / value for sc, year, value in cells]
+    assert min(ratios) > 1.0
+    assert max(ratios) < (1.10 if metric == "pgwp" else 1.40)
 
 
-def test_corrected_variant_differs():
-    paper = watanabe2026.pgtp("CH4", 2030, 100, "MESSAGE", "SSP2", "4.5")
-    corrected = watanabe2026.pgtp("CH4", 2030, 100, "MESSAGE", "SSP2", "4.5", paper_code=False)
-    assert corrected > 1.2 * paper  # feedback boxes decaying from their own values
-    # the CO2 response is the same for MESSAGE (all four RCPs), so CO2 itself does not change
-    a = watanabe2026.scenario_series("CO2", "agwp", "MESSAGE", "SSP2", "4.5", 2030, True)
-    b = watanabe2026.scenario_series("CO2", "agwp", "MESSAGE", "SSP2", "4.5", 2030, False)
-    assert np.array_equal(a, b)
+def test_feedback_boxes_decay_from_their_own_values():
+    boxes = watanabe2026._ccf_boxes(0.0, (1.0, 2.0, 3.0))
+    expected = tuple(c * np.exp(-1 / tau) for c, tau in zip((1.0, 2.0, 3.0), (2.376, 30.14, 490.1)))
+    assert np.allclose(boxes, expected, rtol=1e-15)
+
+
+def test_co2_impulse_response_of_the_scenarios_rcp():
+    """IMAGE-SSP1-8.5 uses the RCP8.5 response (the published code used RCP6.0)."""
+    assert watanabe2026.co2_irf_key("8.5") == "RCP85"
+    re = load_re_co2("IMAGE")
+    re_2040 = float(re["SSP1"]["8.5"][list(re["_years"]).index(2040)])
+    expected = watanabe2026.agwp_co2_series(re_2040, load_irf_co2()["RCP85"])
+    assert np.array_equal(watanabe2026.scenario_series("CO2", "agwp", "IMAGE", "SSP1", "8.5", 2040), expected)
 
 
 def test_tabulated_co2_response_equals_paper_co2():
@@ -154,16 +151,15 @@ def inventory(ids, year):
 
 
 @bw2test
-@pytest.mark.parametrize("metric, table, gas", [("pGWP", "003", "CH4"), ("pGWP", "004", "N2O"), ("pGTP", "001", "CH4"), ("pGTP", "002", "N2O")])
-def test_characterize_reproduces_the_si_tables(metric, table, gas):
+@pytest.mark.parametrize("metric, gas", [("pGWP", "CH4"), ("pGWP", "N2O"), ("pGTP", "CH4"), ("pGTP", "N2O")])
+def test_characterize_gives_the_watanabe2026_metrics(metric, gas):
     ids = setup_project()
-    cells = {(sc, year): value for sc, year, value in _si_table(table)}
+    port = watanabe2026.pgwp if metric == "pGWP" else watanabe2026.pgtp
     for scenario, year in ((("MESSAGE", "SSP2", "4.5"), 2030), (("IMAGE", "SSP1", "8.5"), 2045), (("AIM", "SSP3", "6.0"), 2050)):
         set_scenario(*scenario)
         result = characterize(inventory(ids, year), metric=metric, base_lcia_method=METHOD, time_horizon=100, characterization_options=AR6)
         by_flow = result.groupby("flow").amount.sum() / 3.0
-        code = gas.lower()
-        assert by_flow[ids[code]] == pytest.approx(cells[(scenario, year)], abs=TOLERANCE)
+        assert by_flow[ids[gas.lower()]] == pytest.approx(port(gas, year, 100, *scenario), rel=1e-9)
         assert by_flow[ids["co2"]] == pytest.approx(1.0, rel=1e-12)
         assert by_flow[ids["co2_in_air"]] == pytest.approx(-1.0, rel=1e-12)
         if gas == "CH4":  # the paper does not distinguish fossil and non-fossil CH4
@@ -197,16 +193,18 @@ def test_other_gases_use_the_paper_co2_reference():
 
 
 @bw2test
-def test_methods_and_paper_code_options():
+def test_the_two_methods_differ():
     ids = setup_project()
     set_scenario("IMAGE", "SSP1", "8.5")
     values = {}
-    for label, options in {
-        "paper": AR6,
-        "corrected": dict(AR6, prospective_paper_code=False),
-        "ar6": dict(AR6, prospective_method="ar6"),
-    }.items():
+    for method in ("watanabe2026", "ar6"):
+        options = dict(AR6, prospective_method=method)
         result = characterize(inventory(ids, 2030), metric="pGWP", base_lcia_method=METHOD, characterization_options=options)
-        values[label] = result.groupby("flow").amount.sum()[ids["ch4"]] / 3.0
-    assert values["paper"] == pytest.approx(28.2, abs=TOLERANCE)  # SI table 003, IMAGE-SSP1-8.5, 2030
-    assert len({round(v, 3) for v in values.values()}) == 3
+        values[method] = result.groupby("flow").amount.sum()[ids["ch4"]] / 3.0
+    assert values["watanabe2026"] == pytest.approx(watanabe2026.pgwp("CH4", 2030, 100, "IMAGE", "SSP1", "8.5"), rel=1e-9)
+    assert abs(values["watanabe2026"] / values["ar6"] - 1) > 0.02
+
+
+def test_paper_code_option_is_gone():
+    with pytest.raises(ValueError, match="Unknown characterization option"):
+        CharacterizationOptions.from_value({"parameter_set": "ar6", "prospective_paper_code": True})
