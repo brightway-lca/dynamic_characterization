@@ -88,3 +88,17 @@ def build_cas_index(keys: Iterable[str]) -> Dict[str, str]:
         if typo in index and correct not in index:
             index[correct] = index[typo]
     return index
+
+
+def is_co2_uptake(node) -> bool:
+    """
+    True if a CO2 biosphere flow is an uptake from the atmosphere rather than an emission.
+
+    Only the categories are checked, so that emissions to air from flows like "Carbon dioxide,
+    from soil or biomass stock" are not misread as uptake:
+
+    - CO2 to the soil compartment (e.g. "Carbon dioxide, to soil or biomass stock");
+    - CO2 as a natural resource in air, assumed to be taken up by biomass or CDR processes.
+    """
+    categories = node.get("categories") or ()
+    return "soil" in categories or ("in air" in categories and node.get("type") == "natural resource")

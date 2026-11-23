@@ -13,8 +13,9 @@ import numpy as np
 import pandas as pd
 from bw2data.utils import UnknownObject
 
+from dynamic_characterization.ar6_dispatch import build_functions as build_ar6_functions
 from dynamic_characterization.classes import CharacterizedRow
-from dynamic_characterization.flows import build_cas_index, normalize_cas
+from dynamic_characterization.flows import build_cas_index, is_co2_uptake, normalize_cas
 from dynamic_characterization.ipcc_ar6.radiative_forcing import (
     characterize_ch4,
     characterize_co,
@@ -23,6 +24,8 @@ from dynamic_characterization.ipcc_ar6.radiative_forcing import (
     characterize_n2o,
     create_generic_characterization_function,
 )
+from dynamic_characterization.ipcc_ar6.radiative_forcing import characterize_co2_ar6
+from dynamic_characterization.options import CharacterizationOptions
 from dynamic_characterization.prospective import agwp, agtp
 from dynamic_characterization.prospective.radiative_forcing import (
     characterize_ch4 as prospective_characterize_ch4,
@@ -52,6 +55,26 @@ def clear_characterization_function_cache() -> None:
     _CHARACTERIZATION_FUNCTION_CACHE.clear()
 
 
+_DEFAULT_PARAMETER_SET_WARNED = False
+
+
+def _warn_default_parameter_set() -> None:
+    """Warn once per process that the default parameter set will change."""
+    global _DEFAULT_PARAMETER_SET_WARNED
+    if _DEFAULT_PARAMETER_SET_WARNED:
+        return
+    _DEFAULT_PARAMETER_SET_WARNED = True
+    warnings.warn(
+        "The default characterization functions use parameter_set='legacy', which differs from "
+        "the IPCC AR6 metrics (e.g. fossil CH4 GWP100 26.7 instead of 29.8). The default will "
+        "change to 'ar6' in dynamic_characterization 2.0. Pass "
+        "characterization_options={'parameter_set': 'ar6'} to use the AR6 functions now, or "
+        "{'parameter_set': 'legacy'} to keep the current ones and silence this warning.",
+        FutureWarning,
+        stacklevel=3,
+    )
+
+
 def characterize(
     dynamic_inventory_df: pd.DataFrame,
     metric: str = "radiative_forcing",
@@ -64,6 +87,7 @@ def characterize(
     time_varying_re: bool = False,
     fallback_to_ipcc: bool = True,
     characterize_biogenic_uptake: bool = True,
+    characterization_options: dict = None,
 ) -> pd.DataFrame:
     """
     Characterizes the dynamic inventory, formatted as a Dataframe, by evaluating each emission (row in DataFrame) using given dynamic characterization functions.
@@ -116,7 +140,14 @@ def characterize(
         Whether to characterize biogenic uptake flows (e.g. CO2 uptake by soil or biomass, or CDR processes).
         If True, the default characterization functions include uptake flows and these are characterized with a negative emission profile. Default is True.
         Set to False if you want to explicitly model uptake outside of the dynamic characterization (e.g. from a forest model)
-        
+    characterization_options: dict, optional
+        Options for the default characterization functions, see
+        :class:`dynamic_characterization.options.CharacterizationOptions`. The most important one
+        is ``"parameter_set"``: ``"legacy"`` (default) or ``"ar6"``, which reproduces the IPCC AR6
+        metrics (e.g. ``{"parameter_set": "ar6"}``). With ``"ar6"`` and metric "GWP", the CO2
+        reference also uses the AR6 parameters. ``"ar6"`` is not yet available for the
+        prospective metrics.
+
     Returns
     -------
     pd.DataFrame
@@ -132,6 +163,13 @@ def characterize(
     # For prospective metrics, use Watanabe characterization functions
     use_prospective = metric in {"pGWP", "pGTP", "prospective_radiative_forcing"}
 
+    options = CharacterizationOptions.from_value(characterization_options)
+    if use_prospective and options.parameter_set == "ar6":
+        raise NotImplementedError(
+            "parameter_set='ar6' is not yet available for the prospective metrics "
+            "(pGWP, pGTP, prospective_radiative_forcing)."
+        )
+
     if not characterization_functions:
         logger.info(
             "No custom dynamic characterization functions provided. Using default dynamic \
@@ -144,11 +182,17 @@ def characterize(
                 functions on."
             )
         characterization_functions = create_characterization_functions_from_method(
-            base_lcia_method, use_prospective=use_prospective, fallback_to_ipcc=fallback_to_ipcc, characterize_uptake=characterize_biogenic_uptake
+            base_lcia_method,
+            use_prospective=use_prospective,
+            fallback_to_ipcc=fallback_to_ipcc,
+            characterize_uptake=characterize_biogenic_uptake,
+            characterization_options=characterization_options,
         )
 
     if metric == "GWP" and not characterization_function_co2:
-        characterization_function_co2 = characterize_co2
+        characterization_function_co2 = (
+            characterize_co2_ar6 if options.parameter_set == "ar6" else characterize_co2
+        )
 
     # Fast path: for the (default) radiative_forcing metric without a fixed time
     # horizon, every row of a given flow uses the same characterization function
@@ -363,6 +407,7 @@ def create_characterization_functions_from_method(
     use_prospective: bool = False,
     fallback_to_ipcc: bool = True,
     characterize_uptake: bool = True,
+    characterization_options: dict = None,
 ) -> dict:
     """
     Add default dynamic characterization functions for CO2, CH4, N2O and other GHGs, based on IPCC
@@ -399,6 +444,12 @@ def create_characterization_functions_from_method(
         Whether to include characterization functions for biogenic uptake flows (e.g. CO2 uptake by soil or biomass, or CDR processes).
         If True (default), the default characterization functions include uptake. Set to False
         if you want to explicitly model uptake outside of the dynamic characterization (e.g. from a forest model)
+    characterization_options: dict, optional
+        Options for the default characterization functions, see
+        :class:`dynamic_characterization.options.CharacterizationOptions`. With
+        ``{"parameter_set": "ar6"}``, the functions reproduce the IPCC AR6 metrics and the
+        limitations listed above do not apply (CO is still characterized by its oxidation only).
+        Without options, ``"legacy"`` is used and a ``FutureWarning`` is issued once.
 
     Returns
     -------
@@ -407,12 +458,21 @@ def create_characterization_functions_from_method(
 
     """
 
+    if characterization_options is None:
+        _warn_default_parameter_set()
+    options = CharacterizationOptions.from_value(characterization_options)
+    if use_prospective and options.parameter_set == "ar6":
+        raise NotImplementedError(
+            "parameter_set='ar6' is not yet available for the prospective characterization functions."
+        )
+
     cache_key = (
         bd.projects.current,
         tuple(base_lcia_method),
         use_prospective,
         fallback_to_ipcc,
         characterize_uptake,
+        options,
     )
     cached = _CHARACTERIZATION_FUNCTION_CACHE.get(cache_key)
     if cached is not None:
@@ -466,6 +526,13 @@ def create_characterization_functions_from_method(
 
     bioflow_nodes = set(get_bioflow_node(identifier) for identifier, _ in method_data)
 
+    if options.parameter_set == "ar6":
+        characterization_functions = build_ar6_functions(
+            bioflow_nodes, options, characterize_uptake=characterize_uptake
+        )
+        _CHARACTERIZATION_FUNCTION_CACHE[cache_key] = characterization_functions
+        return characterization_functions
+
     # Select characterization functions based on whether prospective metrics are used
     if use_prospective:
         co2_func = prospective_characterize_co2
@@ -480,18 +547,7 @@ def create_characterization_functions_from_method(
 
     for node in bioflow_nodes:
         if "carbon dioxide" in node["name"].lower():
-            categories = node.get("categories") or ()
-            # uptake by soil, i.e. CO2 leaving the technosphere towards the soil compartment.
-            # Only the categories are checked, so that emissions to air from flows like
-            # "Carbon dioxide, from soil or biomass stock" are not misread as uptake.
-            is_soil_uptake = "soil" in categories
-            # CO2 as a natural resource in air is assumed to be used for uptake in biomass
-            # or CDR processes
-            is_uptake_resource = (
-                "in air" in categories and node.get("type") == "natural resource"
-            )
-
-            if is_soil_uptake or is_uptake_resource:
+            if is_co2_uptake(node):
                 if characterize_uptake:
                     characterization_functions[node.id] = (
                         co2_uptake_func  # negative emission because of uptake
@@ -796,3 +852,73 @@ def _characterize_prospective_radiative_forcing(
         time_horizon,
         time_varying_re=time_varying_re,
     )
+
+
+def compare_with_static(
+    base_lcia_method: Tuple[str, ...],
+    time_horizon: int = 100,
+    characterization_options: dict = None,
+    characterize_uptake: bool = True,
+) -> pd.DataFrame:
+    """
+    Compare the static characterization factors of a method with the dynamic GWP of its
+    default characterization functions, flow by flow.
+
+    The dynamic GWP of a flow is the forcing of a 1 kg pulse summed over ``time_horizon`` years,
+    divided by that of 1 kg CO2 with the same parameter set (as the "GWP" metric of
+    :func:`characterize` does).
+
+    Parameters
+    ----------
+    base_lcia_method : tuple
+        The static LCIA method, e.g. ``("ecoinvent-3.12", "IPCC 2021", "climate change",
+        "global warming potential (GWP100)")``.
+    time_horizon : int, optional
+        Time horizon of the dynamic GWP in years. Default 100.
+    characterization_options : dict, optional
+        As for :func:`characterize`, e.g. ``{"parameter_set": "ar6"}``.
+    characterize_uptake : bool, optional
+        As for :func:`create_characterization_functions_from_method`.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per method flow: ``flow`` (id), ``name``, ``categories``, ``static_cf``,
+        ``dynamic_gwp`` (NaN if the flow has no default function) and ``ratio``
+        (dynamic / static), sorted by name.
+    """
+    options = CharacterizationOptions.from_value(characterization_options)
+    functions = create_characterization_functions_from_method(
+        base_lcia_method,
+        characterize_uptake=characterize_uptake,
+        characterization_options=options,
+    )
+    co2_function = characterize_co2_ar6 if options.parameter_set == "ar6" else characterize_co2
+
+    unit = _VectorizationRow(date=pd.Timestamp("2020-01-01"), amount=1.0, flow=None, activity=None)
+    co2_integral = co2_function(unit, time_horizon).amount.sum()
+
+    biosphere_db = bd.Database(bd.config.biosphere)
+    rows = []
+    for identifier, static_cf in bd.Method(base_lcia_method).load():
+        if isinstance(identifier, int):
+            node = biosphere_db.get(id=identifier)
+        else:
+            node = biosphere_db.get(database=identifier[0], code=identifier[1])
+        func = functions.get(node.id)
+        dynamic = (
+            func(unit._replace(flow=node.id), time_horizon).amount.sum() / co2_integral
+            if func is not None
+            else np.nan
+        )
+        rows.append(
+            {
+                "flow": node.id,
+                "name": node["name"],
+                "categories": tuple(node.get("categories") or ()),
+                "static_cf": float(static_cf),
+                "dynamic_gwp": float(dynamic),
+                "ratio": float(dynamic) / float(static_cf) if static_cf else np.nan,
+            }
+        )
+    return pd.DataFrame(rows).sort_values(["name", "categories"]).reset_index(drop=True)
