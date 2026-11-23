@@ -4,6 +4,7 @@ from typing import Callable, Dict, Iterable, NamedTuple, Optional
 
 from loguru import logger
 
+from dynamic_characterization import ar6_prospective
 from dynamic_characterization.flows import is_co2_uptake, normalize_cas
 from dynamic_characterization.ipcc_ar6 import ar6_core, gases
 from dynamic_characterization.ipcc_ar6.radiative_forcing import (
@@ -96,8 +97,19 @@ def classify_flow(node, options: Optional[CharacterizationOptions] = None) -> Fl
     return FlowClass(species, origin)
 
 
-def function_for(flow_class: FlowClass, options: CharacterizationOptions, flow_label: str = "") -> Optional[Callable]:
-    """The ``"ar6"`` characterization function for a classified flow, or None."""
+def function_for(
+    flow_class: FlowClass,
+    options: CharacterizationOptions,
+    flow_label: str = "",
+    prospective: bool = False,
+) -> Optional[Callable]:
+    """
+    The ``"ar6"`` characterization function for a classified flow, or None.
+
+    With ``prospective=True`` the function follows the scenario of ``prospective.set_scenario``
+    (see ``ar6_prospective``): CO2 terms use the scenario CO2 response, CH4 and N2O the
+    scenario radiative efficiencies.
+    """
     ccf = ar6_core.ccf_parameters(options.ccf_parameters) if options.climate_carbon_feedback else None
     precursor_ccf = ccf if options.precursor_ccf else None
     species, origin = flow_class
@@ -105,9 +117,9 @@ def function_for(flow_class: FlowClass, options: CharacterizationOptions, flow_l
     if species is None:
         return None
     if species == "CO2":
-        return characterize_co2_ar6
+        return ar6_prospective.characterize_co2_ar6_prospective if prospective else characterize_co2_ar6
     if species == "CO2 uptake":
-        return characterize_co2_uptake_ar6
+        return ar6_prospective.characterize_co2_uptake_ar6_prospective if prospective else characterize_co2_uptake_ar6
     if species == "CH4":
         if origin is None:
             origin = options.unspecified_origin
@@ -117,13 +129,22 @@ def function_for(flow_class: FlowClass, options: CharacterizationOptions, flow_l
                 flow_label,
                 origin,
             )
-        spec = gases.ch4(
+        ch4_options = dict(
             origin=origin,
             biogenic_oxidation_co2=options.biogenic_oxidation_co2,
             oxidation_yield=options.ch4_oxidation_yield,
             ccf=ccf,
         )
+        if prospective:
+            return ar6_prospective.make_prospective_function(
+                ar6_prospective.Recipe(kind="CH4", options=tuple(sorted(ch4_options.items())))
+            )
+        spec = gases.ch4(**ch4_options)
     elif species == "N2O":
+        if prospective:
+            return ar6_prospective.make_prospective_function(
+                ar6_prospective.Recipe(kind="N2O", options=(("ccf", ccf),))
+            )
         spec = gases.n2o(ccf=ccf)
     elif species == "CO":
         if "CO" in options.include_precursors:
@@ -159,22 +180,34 @@ def function_for(flow_class: FlowClass, options: CharacterizationOptions, flow_l
         spec = gases.halocarbon(species, ccf=ccf)
         if spec is None:
             return None
-    return make_characterization_function(spec)
+    return ar6_prospective.fixed(spec) if prospective else make_characterization_function(spec)
+
+
+SCENARIO_SPECIES = ("CO2", "CO2 uptake", "CH4", "N2O")
 
 
 def build_functions(
     nodes: Iterable,
     options: CharacterizationOptions,
     characterize_uptake: bool = True,
+    prospective: bool = False,
+    fallback_to_ipcc: bool = True,
 ) -> Dict[int, Callable]:
-    """``{node.id: function}`` for all nodes that have an ``"ar6"`` characterization function."""
+    """
+    ``{node.id: function}`` for all nodes that have an ``"ar6"`` characterization function.
+
+    With ``prospective=True`` the functions follow the prospective scenario; with
+    ``fallback_to_ipcc=False`` only the gases with scenario data (CO2, CH4, N2O) are included.
+    """
     functions = {}
     for node in nodes:
         flow_class = classify_flow(node, options)
         if flow_class.species == "CO2 uptake" and not characterize_uptake:
             continue
+        if prospective and not fallback_to_ipcc and flow_class.species not in SCENARIO_SPECIES:
+            continue
         label = f"{node.get('name')} {tuple(node.get('categories') or ())}"
-        func = function_for(flow_class, options, flow_label=label)
+        func = function_for(flow_class, options, flow_label=label, prospective=prospective)
         if func is not None:
             functions[node.id] = func
     return functions

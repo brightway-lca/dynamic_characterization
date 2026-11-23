@@ -91,6 +91,8 @@ def parameters() -> dict:
         "ch4": {
             "_source": "ch4.py and notebook 335; oxidation: AR6 Eq. 7.SM.5.8 and Section 7.6.1.3",
             "radiative_efficiency_direct_W_m2_ppb": re_ch4_direct,
+            "tropospheric_adjustment": -0.14,
+            "_radiative_efficiency_direct": "Meinshausen 2020 SARF x (1 + tropospheric_adjustment); a scenario-dependent SARF gets the same adjustment",
             "radiative_efficiency_ozone_W_m2_ppb": 1.4e-4,
             "radiative_efficiency_stratospheric_h2o_W_m2_ppb": 0.4e-4,
             "lifetime": 11.8,
@@ -101,6 +103,7 @@ def parameters() -> dict:
         "n2o": {
             "_source": "n2o.py and notebook 335 (CH4 destruction from AR5 8.SM.11.3.3)",
             "radiative_efficiency_direct_W_m2_ppb": re_n2o_direct,
+            "tropospheric_adjustment": 0.07,
             "radiative_efficiency_ozone_W_m2_ppb": 5.5e-4,
             "ch4_per_n2o": -1.7,
             "lifetime": 109.0,

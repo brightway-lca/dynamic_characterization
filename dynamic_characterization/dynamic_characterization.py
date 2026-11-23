@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 from bw2data.utils import UnknownObject
 
+from dynamic_characterization import ar6_prospective
 from dynamic_characterization.ar6_dispatch import build_functions as build_ar6_functions
 from dynamic_characterization.classes import CharacterizedRow
 from dynamic_characterization.flows import build_cas_index, is_co2_uptake, normalize_cas
@@ -145,8 +146,9 @@ def characterize(
         :class:`dynamic_characterization.options.CharacterizationOptions`. The most important one
         is ``"parameter_set"``: ``"legacy"`` (default) or ``"ar6"``, which reproduces the IPCC AR6
         metrics (e.g. ``{"parameter_set": "ar6"}``). With ``"ar6"`` and metric "GWP", the CO2
-        reference also uses the AR6 parameters. ``"ar6"`` is not yet available for the
-        prospective metrics.
+        reference also uses the AR6 parameters. With the prospective metrics, the ``"ar6"``
+        functions follow the scenario (see ``ar6_prospective``; horizons up to 100 years, no
+        ``time_varying_re``).
 
     Returns
     -------
@@ -164,10 +166,11 @@ def characterize(
     use_prospective = metric in {"pGWP", "pGTP", "prospective_radiative_forcing"}
 
     options = CharacterizationOptions.from_value(characterization_options)
-    if use_prospective and options.parameter_set == "ar6":
+    ar6 = options.parameter_set == "ar6"
+    if use_prospective and ar6 and time_varying_re:
         raise NotImplementedError(
-            "parameter_set='ar6' is not yet available for the prospective metrics "
-            "(pGWP, pGTP, prospective_radiative_forcing)."
+            "time_varying_re=True is not available with parameter_set='ar6'; the radiative "
+            "efficiencies of the emission year are used."
         )
 
     if not characterization_functions:
@@ -248,6 +251,7 @@ def characterize(
                     original_time_horizon=time_horizon,
                     dynamic_time_horizon=dynamic_time_horizon,
                     time_varying_re=time_varying_re,
+                    ar6=ar6,
                 )
             )
 
@@ -259,6 +263,7 @@ def characterize(
                     original_time_horizon=time_horizon,
                     dynamic_time_horizon=dynamic_time_horizon,
                     time_varying_re=time_varying_re,
+                    ar6=ar6,
                 )
             )
 
@@ -462,10 +467,6 @@ def create_characterization_functions_from_method(
     if characterization_options is None:
         _warn_default_parameter_set()
     options = CharacterizationOptions.from_value(characterization_options)
-    if use_prospective and options.parameter_set == "ar6":
-        raise NotImplementedError(
-            "parameter_set='ar6' is not yet available for the prospective characterization functions."
-        )
 
     cache_key = (
         bd.projects.current,
@@ -529,7 +530,11 @@ def create_characterization_functions_from_method(
 
     if options.parameter_set == "ar6":
         characterization_functions = build_ar6_functions(
-            bioflow_nodes, options, characterize_uptake=characterize_uptake
+            bioflow_nodes,
+            options,
+            characterize_uptake=characterize_uptake,
+            prospective=use_prospective,
+            fallback_to_ipcc=fallback_to_ipcc,
         )
         _CHARACTERIZATION_FUNCTION_CACHE[cache_key] = characterization_functions
         return characterization_functions
@@ -687,12 +692,15 @@ def _characterize_pgwp(
     original_time_horizon,
     dynamic_time_horizon,
     time_varying_re: bool = False,
+    ar6: bool = False,
 ) -> CharacterizedRow:
     """
     Calculate prospective GWP using Watanabe et al. (2026) characterization.
 
     Uses AGWP_gas / AGWP_CO2 to calculate kg CO2 equivalent.
-    Emission year is extracted from the row's date.
+    Emission year is extracted from the row's date. With ``ar6=True`` the CO2 reference is the
+    AR6 CO2 pulse with the scenario CO2 response (``ar6_prospective``), in the same time
+    convention as the "ar6" functions.
     """
     # Get emission year from the row date
     emission_date = row.date
@@ -707,11 +715,16 @@ def _characterize_pgwp(
     )
 
     # Calculate reference AGWP for 1 kg of CO2
-    radiative_forcing_co2 = prospective_characterize_co2(
-        row._replace(amount=1),
-        original_time_horizon,
-        time_varying_re=time_varying_re,
-    )
+    if ar6:
+        radiative_forcing_co2 = ar6_prospective.characterize_co2_ar6_prospective(
+            row._replace(amount=1), original_time_horizon
+        )
+    else:
+        radiative_forcing_co2 = prospective_characterize_co2(
+            row._replace(amount=1),
+            original_time_horizon,
+            time_varying_re=time_varying_re,
+        )
 
     ghg_integral = radiative_forcing_ghg.amount.sum()
     co2_integral = radiative_forcing_co2.amount.sum()
@@ -731,12 +744,15 @@ def _characterize_pgtp(
     original_time_horizon,
     dynamic_time_horizon,
     time_varying_re: bool = False,
+    ar6: bool = False,
 ) -> CharacterizedRow:
     """
     Calculate prospective GTP using Watanabe et al. (2026) characterization.
 
     Uses AGTP_gas / AGTP_CO2 to calculate kg CO2 equivalent.
-    Emission year is extracted from the row's date.
+    Emission year is extracted from the row's date. With ``ar6=True``, the "ar6" functions give
+    their own AGTP (AR6 temperature response, scenario CO2 response), and the CO2 reference is
+    computed the same way.
     """
     # Get emission year from the row date
     emission_date = row.date
@@ -748,6 +764,16 @@ def _characterize_pgtp(
     char_func = characterization_functions[row.flow]
 
     # Get the AGTP for this gas
+    if ar6:
+        reference = ar6_prospective.characterize_co2_ar6_prospective
+        if hasattr(char_func, "agtp_for"):
+            agtp_gas = char_func.agtp_for(row.date, dynamic_time_horizon)
+        else:  # a custom function: AGTP from its forcing, with the same temperature response
+            agtp_gas = _agtp_from_radiative_forcing(char_func, row, dynamic_time_horizon)
+            reference = None
+        if reference is not None:
+            co2_equiv = row.amount * agtp_gas / reference.agtp_for(row.date, original_time_horizon)
+            return CharacterizedRow(date=row.date, amount=co2_equiv, flow=row.flow, activity=row.activity)
     if char_func in (prospective_characterize_co2, prospective_characterize_co2_uptake):
         agtp_gas = agtp.agtp_co2(
             emission_year=emission_year,

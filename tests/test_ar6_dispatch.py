@@ -178,14 +178,6 @@ def test_vectorized_radiative_forcing_equals_row_loop():
 
 
 @bw2test
-def test_prospective_metrics_are_not_yet_available_with_ar6():
-    setup_project()
-    _, df = inventory(setup_project())
-    with pytest.raises(NotImplementedError):
-        characterize(df, metric="pGWP", base_lcia_method=METHOD, characterization_options=AR6)
-
-
-@bw2test
 def test_future_warning_once_without_options(monkeypatch):
     setup_project()
     monkeypatch.setattr(dc, "_DEFAULT_PARAMETER_SET_WARNED", False)

@@ -46,15 +46,23 @@ def co2_uptake() -> GasSpec:
     return co2_spec().scaled(-1.0, name="CO2 uptake")
 
 
-def _ch4_radiative_efficiency_per_kg() -> float:
-    p = load_parameters()
-    ch4 = p["ch4"]
-    re = (
-        ch4["radiative_efficiency_direct_W_m2_ppb"]
-        + ch4["radiative_efficiency_ozone_W_m2_ppb"]
-        + ch4["radiative_efficiency_stratospheric_h2o_W_m2_ppb"]
-    )
-    return re / kg_per_ppb(p["constants"]["M_ch4"])
+def _ch4_radiative_efficiency_ppb(direct_radiative_efficiency: Optional[float] = None) -> float:
+    """
+    Total CH4 radiative efficiency [W m-2 ppb-1]: direct (adjusted) plus ozone and stratospheric
+    water vapour. ``direct_radiative_efficiency`` is an unadjusted (stratospheric-temperature-
+    adjusted) value, e.g. from a scenario; it then gets the AR6 tropospheric adjustment. None
+    uses the AR6 value.
+    """
+    ch4 = load_parameters()["ch4"]
+    if direct_radiative_efficiency is None:
+        direct = ch4["radiative_efficiency_direct_W_m2_ppb"]
+    else:
+        direct = direct_radiative_efficiency * (1 + ch4["tropospheric_adjustment"])
+    return direct + ch4["radiative_efficiency_ozone_W_m2_ppb"] + ch4["radiative_efficiency_stratospheric_h2o_W_m2_ppb"]
+
+
+def _ch4_radiative_efficiency_per_kg(direct_radiative_efficiency: Optional[float] = None) -> float:
+    return _ch4_radiative_efficiency_ppb(direct_radiative_efficiency) / kg_per_ppb(load_parameters()["constants"]["M_ch4"])
 
 
 def ch4(
@@ -62,6 +70,7 @@ def ch4(
     biogenic_oxidation_co2: str = "ar6",
     oxidation_yield: Optional[float] = None,
     ccf: Optional[CCFParameters] = None,
+    direct_radiative_efficiency: Optional[float] = None,
 ) -> GasSpec:
     """
     1 kg CH4, including ozone and stratospheric water vapour (AR6 Table 7.SM.7).
@@ -84,6 +93,10 @@ def ch4(
     ccf : CCFParameters, optional
         Climate-carbon feedback added to the CH4 forcing (AR6 adds it), or None. It is not
         applied to the oxidation CO2.
+    direct_radiative_efficiency : float, optional
+        Unadjusted direct radiative efficiency [W m-2 ppb-1], e.g. scenario-dependent; it gets
+        the AR6 tropospheric adjustment (-14 %), and the AR6 ozone and water vapour terms are
+        added. None uses the AR6 value.
     """
     if origin not in ("fossil", "non-fossil"):
         raise ValueError(f"origin must be 'fossil' or 'non-fossil', not {origin!r}")
@@ -98,7 +111,9 @@ def ch4(
         raise ValueError(f"oxidation_yield must be between 0 and 1, not {yield_}")
     co2_per_ch4 = constants["M_co2"] / constants["M_ch4"]
 
-    spec = exponential_spec("CH4", _ch4_radiative_efficiency_per_kg(), p["ch4"]["lifetime"], ccf=ccf)
+    spec = exponential_spec(
+        "CH4", _ch4_radiative_efficiency_per_kg(direct_radiative_efficiency), p["ch4"]["lifetime"], ccf=ccf
+    )
     add_oxidation = origin == "fossil" or biogenic_oxidation_co2 in ("ar6", "explicit")
     if add_oxidation and yield_ > 0:
         spec = spec + co2_from_decay(yield_ * co2_per_ch4, p["ch4"]["oxidation_lifetime"])
@@ -107,15 +122,28 @@ def ch4(
     return spec.renamed(f"CH4, {origin}")
 
 
-def n2o(ccf: Optional[CCFParameters] = None) -> GasSpec:
-    """1 kg N2O, including its effects on ozone and on the CH4 lifetime (AR6 Table 7.SM.7)."""
+def n2o(
+    ccf: Optional[CCFParameters] = None,
+    direct_radiative_efficiency: Optional[float] = None,
+    ch4_direct_radiative_efficiency: Optional[float] = None,
+) -> GasSpec:
+    """
+    1 kg N2O, including its effects on ozone and on the CH4 lifetime (AR6 Table 7.SM.7).
+
+    ``direct_radiative_efficiency`` and ``ch4_direct_radiative_efficiency`` are unadjusted values
+    [W m-2 ppb-1], e.g. from a scenario; they get the AR6 tropospheric adjustments (N2O +7 %,
+    CH4 -14 %). None uses the AR6 values.
+    """
     p = load_parameters()
     n = p["n2o"]
-    ch4_re_ppb = _ch4_radiative_efficiency_per_kg() * kg_per_ppb(p["constants"]["M_ch4"])
+    if direct_radiative_efficiency is None:
+        direct = n["radiative_efficiency_direct_W_m2_ppb"]
+    else:
+        direct = direct_radiative_efficiency * (1 + n["tropospheric_adjustment"])
     re = (
-        n["radiative_efficiency_direct_W_m2_ppb"]
+        direct
         + n["radiative_efficiency_ozone_W_m2_ppb"]
-        + n["ch4_per_n2o"] * ch4_re_ppb
+        + n["ch4_per_n2o"] * _ch4_radiative_efficiency_ppb(ch4_direct_radiative_efficiency)
     )
     return exponential_spec("N2O", re / kg_per_ppb(p["constants"]["M_n2o"]), n["lifetime"], ccf=ccf)
 
