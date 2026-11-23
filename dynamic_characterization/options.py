@@ -12,6 +12,7 @@ BIOGENIC_OXIDATION_MODES = ("ar6", "neutral", "explicit")
 CCF_PARAMETER_SETS = ("gasser2017_mean", "gasser2017_upper", "gasser2017_lower")
 _OVERRIDE_KEYS = ("species", "origin")
 PRECURSORS = ("CO", "H2", "VOC")
+PROSPECTIVE_METHODS = ("watanabe2026", "ar6")
 _PARAMETER_SET_SPECIES = ("CO", "VOC", "H2", "NOx", "nitrate")
 
 
@@ -64,6 +65,16 @@ class CharacterizationOptions:
     precursor_ccf : bool
         ``"ar6"`` only. Add the climate-carbon feedback to the precursors (the published sets
         do not include it; AR6 adds it to all its metrics). Default False.
+    prospective_method : {"watanabe2026", "ar6"}
+        ``"ar6"`` with the prospective metrics only. ``"watanabe2026"`` (default) computes CO2,
+        CH4 and N2O as Barbosa Watanabe & Cherubini (2026), reproducing the paper's tables;
+        ``"ar6"`` applies the AR6 recipe (tropospheric adjustments, AR6 climate-carbon feedback and
+        temperature response) to the scenario inputs. See ``ar6_prospective``.
+    prospective_paper_code : bool
+        With ``prospective_method="watanabe2026"``. True (default) reproduces the published code
+        and tables, including two features that look unintended (CO2 impulse response chosen by
+        scenario position, not RCP; feedback boxes 2 and 3 decaying from box 1). False corrects
+        both. See ``prospective.watanabe2026``.
     """
 
     parameter_set: str = "legacy"
@@ -78,6 +89,8 @@ class CharacterizationOptions:
     include_nox: bool = False
     nox_nitrate: bool = False
     precursor_ccf: bool = False
+    prospective_method: str = "watanabe2026"
+    prospective_paper_code: bool = True
 
     def __post_init__(self):
         if self.parameter_set in _RESERVED_PARAMETER_SETS:
@@ -88,7 +101,8 @@ class CharacterizationOptions:
         _check("ccf_parameters", self.ccf_parameters, CCF_PARAMETER_SETS)
         _check("biogenic_oxidation_co2", self.biogenic_oxidation_co2, BIOGENIC_OXIDATION_MODES)
         _check("unspecified_origin", self.unspecified_origin, ORIGINS)
-        for name in ("climate_carbon_feedback", "include_nox", "nox_nitrate", "precursor_ccf"):
+        _check("prospective_method", self.prospective_method, PROSPECTIVE_METHODS)
+        for name in ("climate_carbon_feedback", "include_nox", "nox_nitrate", "precursor_ccf", "prospective_paper_code"):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f"{name} must be True or False")
         unknown = set(self.include_precursors) - set(PRECURSORS)

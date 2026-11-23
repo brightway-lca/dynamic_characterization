@@ -1,18 +1,24 @@
 """
 The ``"ar6"`` parameter set with a prospective scenario (metrics pGWP, pGTP and
-prospective_radiative_forcing).
+prospective_radiative_forcing), for the scenario of ``prospective.set_scenario`` and the year of
+each emission. Two methods (option ``prospective_method``):
 
-The pulse responses of ``ipcc_ar6`` are evaluated with the scenario of
-``prospective.set_scenario`` (Watanabe et al. 2026) for the year of each emission:
+``"watanabe2026"`` (default)
+    CO2, CH4 and N2O as in Barbosa Watanabe & Cherubini (2026), reproducing the paper's SI tables
+    (see ``prospective.watanabe2026``): scenario RE and impulse responses, AR6 ozone and
+    stratospheric water vapour terms, the CH4 effect of N2O, a climate-carbon feedback, and an
+    annual two-layer temperature model. ``prospective_paper_code=True`` (default) keeps two
+    features of the published code that the tables depend on; ``False`` corrects them.
+    All other gases (halocarbons, CO, VOC, H2, NOx) keep their AR6 / literature forcing, with their
+    CO2 terms following the same scenario CO2 response and their AGTP from the same temperature
+    scheme, so that the CO2 reference is consistent.
 
-- every CO2 term (emitted CO2, CO2 uptake, oxidation CO2 of fossil CH4 and CO, the CO2 of the
-  climate-carbon feedback) follows the scenario's CO2 radiative efficiency and impulse response;
-- CH4 and N2O use the scenario's direct radiative efficiencies, with the AR6 tropospheric
-  adjustments and indirect terms (ozone, stratospheric water vapour, the CH4 effect of N2O);
-- all other gases (halocarbons, precursors) keep their AR6 / literature forcing.
+``"ar6"``
+    The AR6 recipe with scenario inputs: CO2 terms follow the scenario CO2 response, CH4 and N2O
+    use the scenario direct RE with the AR6 tropospheric adjustments and indirect terms, and the
+    temperature response is the AR6 one.
 
-The temperature response is the AR6 one, for gases and CO2 alike. The scenario CO2 impulse
-response covers 100 years, so do these metrics.
+The scenario CO2 impulse response covers 100 years, so do these metrics.
 """
 
 from dataclasses import dataclass
@@ -23,6 +29,7 @@ import numpy as np
 
 from dynamic_characterization.classes import CharacterizedRow
 from dynamic_characterization.ipcc_ar6 import ar6_core, gases
+from dynamic_characterization.prospective import watanabe2026
 from dynamic_characterization.prospective.config import get_scenario
 from dynamic_characterization.prospective.data_loader import (
     load_irf_co2,
@@ -30,13 +37,20 @@ from dynamic_characterization.prospective.data_loader import (
     load_re_co2,
     load_re_n2o,
 )
-from dynamic_characterization.prospective.radiative_forcing import _get_year_index, _rcp_to_irf_key
+from dynamic_characterization.prospective.radiative_forcing import CONST_CO2, _get_year_index
 
+METHODS = ("watanabe2026", "ar6")
+MAX_YEARS = 100
 _RE_LOADERS = {"CO2": load_re_co2, "CH4": load_re_ch4, "N2O": load_re_n2o}
 
 
 def _emission_year(date) -> int:
     return int(str(np.datetime64(date, "s"))[:4])
+
+
+def _current_scenario() -> Tuple[str, str, str]:
+    scenario = get_scenario()
+    return scenario["iam"], scenario["ssp"], scenario["rcp"]
 
 
 @lru_cache(maxsize=None)
@@ -48,36 +62,47 @@ def scenario_radiative_efficiency(gas: str, iam: str, ssp: str, rcp: str, year: 
 
 
 @lru_cache(maxsize=None)
-def scenario_co2_response(iam: str, ssp: str, rcp: str, year: int) -> ar6_core.TabulatedCO2Response:
-    """RF of 1 kg CO2 emitted in ``year`` of the scenario, from its CO2 RE and impulse response."""
-    per_kg = scenario_radiative_efficiency("CO2", iam, ssp, rcp, year) / ar6_core.kg_per_ppb(
-        ar6_core.load_parameters()["constants"]["M_co2"]
-    )
-    irf = load_irf_co2()[_rcp_to_irf_key(rcp)]
-    return ar6_core.TabulatedCO2Response(
-        name=f"{iam}-{ssp}-{rcp}, {year}", rf=tuple(per_kg * float(value) for value in irf)
-    )
+def scenario_co2_response(
+    iam: str, ssp: str, rcp: str, year: int, method: str = "ar6", paper_code: bool = True
+) -> ar6_core.TabulatedCO2Response:
+    """
+    RF of 1 kg CO2 emitted in ``year`` of the scenario: CO2 RE of the emission year x impulse
+    response. With ``method="watanabe2026"`` the ppb-to-kg conversion and the choice of the
+    impulse response are those of the paper's code, so that its AGWP equals the paper's CO2 AGWP.
+    """
+    re_co2 = scenario_radiative_efficiency("CO2", iam, ssp, rcp, year)
+    if method == "watanabe2026":
+        per_kg = re_co2 * CONST_CO2
+        irf_key = watanabe2026.co2_irf_key(iam, ssp, rcp, paper_code)
+    else:
+        per_kg = re_co2 / ar6_core.kg_per_ppb(ar6_core.load_parameters()["constants"]["M_co2"])
+        irf_key = watanabe2026.co2_irf_key(iam, ssp, rcp, paper_code=False)
+    irf = load_irf_co2()[irf_key]
+    return ar6_core.TabulatedCO2Response(name=f"{iam}-{ssp}-{rcp}, {year}", rf=tuple(per_kg * float(v) for v in irf))
 
 
 @dataclass(frozen=True)
 class Recipe:
     """
-    How to build the pulse response of a flow for a scenario and year: ``kind`` "CH4" and "N2O"
-    take the scenario's radiative efficiencies; ``kind`` "fixed" uses ``spec`` as it is (its CO2
-    terms still follow the scenario).
+    How to build the response of a flow for a scenario and year.
+
+    ``kind``: "CH4" / "N2O" (scenario radiative efficiencies), "fixed" (``spec`` as it is, with
+    its CO2 terms following the scenario), or "paper" (``gas`` "CO2", "CH4" or "N2O" from
+    ``prospective.watanabe2026``, multiplied by ``sign``).
     """
 
     kind: str
+    method: str = "ar6"
+    paper_code: bool = True
     options: Tuple[Tuple[str, object], ...] = ()
     spec: Optional[ar6_core.GasSpec] = None
+    gas: Optional[str] = None
+    sign: float = 1.0
 
     def spec_for(self, iam: str, ssp: str, rcp: str, year: int) -> ar6_core.GasSpec:
         options = dict(self.options)
         if self.kind == "CH4":
-            return gases.ch4(
-                direct_radiative_efficiency=scenario_radiative_efficiency("CH4", iam, ssp, rcp, year),
-                **options,
-            )
+            return gases.ch4(direct_radiative_efficiency=scenario_radiative_efficiency("CH4", iam, ssp, rcp, year), **options)
         if self.kind == "N2O":
             return gases.n2o(
                 direct_radiative_efficiency=scenario_radiative_efficiency("N2O", iam, ssp, rcp, year),
@@ -86,19 +111,38 @@ class Recipe:
             )
         return self.spec
 
+    @property
+    def label(self) -> str:
+        if self.kind == "paper":
+            return f"{self.gas} (Watanabe & Cherubini 2026)" + (" uptake" if self.sign < 0 else "")
+        return self.spec.name if self.spec is not None else self.kind
+
+
+def _check_period(period: float) -> None:
+    if period > MAX_YEARS:
+        raise ValueError(
+            f"parameter_set='ar6' with a prospective scenario covers time horizons up to {MAX_YEARS} "
+            f"years (the length of the scenario CO2 impulse response), not {period}."
+        )
+
 
 @lru_cache(maxsize=None)
-def _spec_and_response(recipe: Recipe, iam: str, ssp: str, rcp: str, year: int):
-    return recipe.spec_for(iam, ssp, rcp, year), scenario_co2_response(iam, ssp, rcp, year)
-
-
-def _check_period(period: float, response: ar6_core.TabulatedCO2Response) -> None:
-    if period > response.max_years:
-        raise ValueError(
-            f"parameter_set='ar6' with a prospective scenario covers time horizons up to "
-            f"{response.max_years} years (the length of the scenario CO2 impulse response), "
-            f"not {period}."
-        )
+def _annual(recipe: Recipe, iam: str, ssp: str, rcp: str, year: int):
+    """(cumulative AGWP at the end of years 1..100, AGTP at years 1..100), per kg."""
+    if recipe.kind == "paper":
+        agwp = recipe.sign * watanabe2026.scenario_series(recipe.gas, "agwp", iam, ssp, rcp, year, recipe.paper_code)[:MAX_YEARS]
+        agtp = recipe.sign * watanabe2026.scenario_series(recipe.gas, "agtp", iam, ssp, rcp, year, recipe.paper_code)[:MAX_YEARS]
+        return np.asarray(agwp), np.asarray(agtp)
+    spec = recipe.spec_for(iam, ssp, rcp, year)
+    response = scenario_co2_response(iam, ssp, rcp, year, recipe.method, recipe.paper_code)
+    agwp = ar6_core.annual_cumulative(spec, MAX_YEARS, response)
+    if recipe.method == "watanabe2026":
+        # AGTP with the paper's temperature scheme (Code #7), applied to the annual RF
+        rf = ar6_core.radiative_forcing(spec, np.arange(MAX_YEARS, dtype="float64"), co2_response=response)
+        agtp = watanabe2026.agtp_from_rf(rf)
+    else:
+        agtp = ar6_core.agtp(spec, np.arange(1, MAX_YEARS + 1, dtype="float64"), co2_response=response)
+    return np.asarray(agwp), np.asarray(agtp)
 
 
 @lru_cache(maxsize=None)
@@ -106,21 +150,20 @@ def make_prospective_function(recipe: Recipe):
     """
     Characterization function for a recipe, with the legacy signature ``(series, period=100,
     cumulative=False)``. The scenario is read from ``prospective.get_scenario()`` and the year
-    from the emission date. As the other ``"ar6"`` functions, the value at ``date + k`` years is
-    the forcing of the year starting then. ``.agwp_for(date, H)`` and ``.agtp_for(date, H)`` give
-    the per-kg metrics.
+    from the emission date. As for the other ``"ar6"`` functions, the value at ``date + k`` years
+    is the forcing of the year starting then; the annual values add up to the AGWP of the
+    horizon. ``.agwp_for(date, H)`` and ``.agtp_for(date, H)`` give the per-kg metrics.
     """
 
-    def resolve(date):
-        scenario = get_scenario()
-        return _spec_and_response(recipe, scenario["iam"], scenario["ssp"], scenario["rcp"], _emission_year(date))
+    def annual(date):
+        return _annual(recipe, *_current_scenario(), _emission_year(date))
 
     def characterize_ar6_prospective(series, period: int = 100, cumulative: bool = False) -> CharacterizedRow:
-        spec, response = resolve(series.date)
-        _check_period(period, response)
+        _check_period(period)
+        agwp, _ = annual(series.date)
         date_beginning: np.datetime64 = series.date.to_numpy()
         dates = date_beginning + np.arange(start=0, stop=period, dtype="timedelta64[Y]").astype("timedelta64[s]")
-        forcing = np.array(series.amount * ar6_core.annual_cumulative(spec, period, response), dtype="float64")
+        forcing = np.array(series.amount * agwp[:period], dtype="float64")
         if not cumulative:
             forcing = np.diff(forcing, prepend=0)
         return CharacterizedRow(
@@ -128,17 +171,14 @@ def make_prospective_function(recipe: Recipe):
         )
 
     def agwp_for(date, time_horizon) -> float:
-        spec, response = resolve(date)
-        _check_period(time_horizon, response)
-        return float(ar6_core.agwp(spec, float(time_horizon), co2_response=response))
+        _check_period(time_horizon)
+        return float(annual(date)[0][int(time_horizon) - 1]) if time_horizon >= 1 else 0.0
 
     def agtp_for(date, time_horizon) -> float:
-        spec, response = resolve(date)
-        _check_period(time_horizon, response)
-        return float(ar6_core.agtp(spec, float(time_horizon), co2_response=response))
+        _check_period(time_horizon)
+        return float(annual(date)[1][int(time_horizon) - 1]) if time_horizon >= 1 else 0.0
 
-    name = recipe.spec.name if recipe.spec is not None else recipe.kind
-    characterize_ar6_prospective.__name__ = f"characterize_ar6_prospective[{name}]"
+    characterize_ar6_prospective.__name__ = f"characterize_ar6_prospective[{recipe.label}, {recipe.method}]"
     characterize_ar6_prospective.__qualname__ = characterize_ar6_prospective.__name__
     characterize_ar6_prospective.recipe = recipe
     characterize_ar6_prospective.agwp_for = agwp_for
@@ -146,10 +186,20 @@ def make_prospective_function(recipe: Recipe):
     return characterize_ar6_prospective
 
 
-def fixed(spec: ar6_core.GasSpec):
+def fixed(spec: ar6_core.GasSpec, method: str = "ar6", paper_code: bool = True):
     """Prospective function for a pulse response that does not depend on the scenario (except CO2)."""
-    return make_prospective_function(Recipe(kind="fixed", spec=spec))
+    return make_prospective_function(Recipe(kind="fixed", spec=spec, method=method, paper_code=paper_code))
 
 
-characterize_co2_ar6_prospective = fixed(gases.co2())
-characterize_co2_uptake_ar6_prospective = fixed(gases.co2_uptake())
+def co2_function(method: str = "watanabe2026", paper_code: bool = True, uptake: bool = False):
+    """The CO2 (or CO2 uptake) function of a method; the CO2 one is also the pGWP/pGTP reference."""
+    if method == "watanabe2026":
+        return make_prospective_function(
+            Recipe(kind="paper", method=method, paper_code=paper_code, gas="CO2", sign=-1.0 if uptake else 1.0)
+        )
+    return fixed(gases.co2_uptake() if uptake else gases.co2(), method="ar6")
+
+
+def paper_function(gas: str, paper_code: bool = True):
+    """CH4 or N2O as in Watanabe & Cherubini (2026)."""
+    return make_prospective_function(Recipe(kind="paper", method="watanabe2026", paper_code=paper_code, gas=gas))

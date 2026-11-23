@@ -116,10 +116,19 @@ def function_for(
 
     if species is None:
         return None
+    method, paper_code = options.prospective_method, options.prospective_paper_code
     if species == "CO2":
-        return ar6_prospective.characterize_co2_ar6_prospective if prospective else characterize_co2_ar6
+        return ar6_prospective.co2_function(method, paper_code) if prospective else characterize_co2_ar6
     if species == "CO2 uptake":
-        return ar6_prospective.characterize_co2_uptake_ar6_prospective if prospective else characterize_co2_uptake_ar6
+        return ar6_prospective.co2_function(method, paper_code, uptake=True) if prospective else characterize_co2_uptake_ar6
+    if prospective and method == "watanabe2026" and species in ("CH4", "N2O"):
+        if species == "CH4" and origin is None:
+            logger.warning(
+                "Flow {!r} does not state a fossil or non-fossil origin; the Watanabe & Cherubini "
+                "(2026) CH4 metric does not distinguish them.",
+                flow_label,
+            )
+        return ar6_prospective.paper_function(species, paper_code)
     if species == "CH4":
         if origin is None:
             origin = options.unspecified_origin
@@ -137,13 +146,13 @@ def function_for(
         )
         if prospective:
             return ar6_prospective.make_prospective_function(
-                ar6_prospective.Recipe(kind="CH4", options=tuple(sorted(ch4_options.items())))
+                ar6_prospective.Recipe(kind="CH4", method="ar6", options=tuple(sorted(ch4_options.items())))
             )
         spec = gases.ch4(**ch4_options)
     elif species == "N2O":
         if prospective:
             return ar6_prospective.make_prospective_function(
-                ar6_prospective.Recipe(kind="N2O", options=(("ccf", ccf),))
+                ar6_prospective.Recipe(kind="N2O", method="ar6", options=(("ccf", ccf),))
             )
         spec = gases.n2o(ccf=ccf)
     elif species == "CO":
@@ -180,7 +189,9 @@ def function_for(
         spec = gases.halocarbon(species, ccf=ccf)
         if spec is None:
             return None
-    return ar6_prospective.fixed(spec) if prospective else make_characterization_function(spec)
+    if prospective:
+        return ar6_prospective.fixed(spec, method=method, paper_code=paper_code)
+    return make_characterization_function(spec)
 
 
 SCENARIO_SPECIES = ("CO2", "CO2 uptake", "CH4", "N2O")

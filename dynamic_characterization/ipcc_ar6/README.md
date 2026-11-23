@@ -61,5 +61,8 @@ the 0.1-yr grid; AGTP with the AR6 temperature response integrated exactly over 
 `dynamic_characterization/ar6_prospective.py` builds that response from the Watanabe et al.
 (2026) scenario data (CO2 radiative efficiency of the emission year x RCP impulse response) and
 gives CH4 and N2O the scenario radiative efficiencies, with the AR6 adjustments
-(`tropospheric_adjustment` in `ar6_parameters.json`). With the AR6 CO2 response sampled annually,
-the tabulated path reproduces the analytic results within 0.05 %.
+(`tropospheric_adjustment` in `ar6_parameters.json`), for `prospective_method="ar6"`. With the AR6
+CO2 response sampled annually, the tabulated path reproduces the analytic results within 0.05 %.
+The default `prospective_method="watanabe2026"` takes CO2, CH4 and N2O from
+`prospective/watanabe2026.py` (port of the paper's code) and uses the paper's CO2 response for
+all other gases.

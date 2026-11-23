@@ -147,8 +147,9 @@ def characterize(
         is ``"parameter_set"``: ``"legacy"`` (default) or ``"ar6"``, which reproduces the IPCC AR6
         metrics (e.g. ``{"parameter_set": "ar6"}``). With ``"ar6"`` and metric "GWP", the CO2
         reference also uses the AR6 parameters. With the prospective metrics, the ``"ar6"``
-        functions follow the scenario (see ``ar6_prospective``; horizons up to 100 years, no
-        ``time_varying_re``).
+        functions follow the scenario: by default CO2, CH4 and N2O as in Watanabe & Cherubini
+        (2026), reproducing the paper's tables (see ``ar6_prospective``; horizons up to 100 years,
+        no ``time_varying_re``).
 
     Returns
     -------
@@ -252,6 +253,7 @@ def characterize(
                     dynamic_time_horizon=dynamic_time_horizon,
                     time_varying_re=time_varying_re,
                     ar6=ar6,
+                    options=options,
                 )
             )
 
@@ -264,6 +266,7 @@ def characterize(
                     dynamic_time_horizon=dynamic_time_horizon,
                     time_varying_re=time_varying_re,
                     ar6=ar6,
+                    options=options,
                 )
             )
 
@@ -693,6 +696,7 @@ def _characterize_pgwp(
     dynamic_time_horizon,
     time_varying_re: bool = False,
     ar6: bool = False,
+    options: CharacterizationOptions = None,
 ) -> CharacterizedRow:
     """
     Calculate prospective GWP using Watanabe et al. (2026) characterization.
@@ -716,9 +720,10 @@ def _characterize_pgwp(
 
     # Calculate reference AGWP for 1 kg of CO2
     if ar6:
-        radiative_forcing_co2 = ar6_prospective.characterize_co2_ar6_prospective(
-            row._replace(amount=1), original_time_horizon
-        )
+        options = options or CharacterizationOptions(parameter_set="ar6")
+        radiative_forcing_co2 = ar6_prospective.co2_function(
+            options.prospective_method, options.prospective_paper_code
+        )(row._replace(amount=1), original_time_horizon)
     else:
         radiative_forcing_co2 = prospective_characterize_co2(
             row._replace(amount=1),
@@ -745,6 +750,7 @@ def _characterize_pgtp(
     dynamic_time_horizon,
     time_varying_re: bool = False,
     ar6: bool = False,
+    options: CharacterizationOptions = None,
 ) -> CharacterizedRow:
     """
     Calculate prospective GTP using Watanabe et al. (2026) characterization.
@@ -765,7 +771,8 @@ def _characterize_pgtp(
 
     # Get the AGTP for this gas
     if ar6:
-        reference = ar6_prospective.characterize_co2_ar6_prospective
+        options = options or CharacterizationOptions(parameter_set="ar6")
+        reference = ar6_prospective.co2_function(options.prospective_method, options.prospective_paper_code)
         if hasattr(char_func, "agtp_for"):
             agtp_gas = char_func.agtp_for(row.date, dynamic_time_horizon)
         else:  # a custom function: AGTP from its forcing, with the same temperature response

@@ -1,4 +1,6 @@
-"""The "ar6" parameter set with a prospective scenario (pGWP, pGTP, prospective_radiative_forcing).
+"""The "ar6" parameter set with a prospective scenario, method "ar6" (AR6 recipe with scenario inputs).
+
+The default method "watanabe2026" is tested in test_paper_watanabe2026.py.
 
 Imports must stay at module level and this module must sort before test_prospective.py, which
 replaces `dynamic_characterization` in sys.modules when it is collected.
@@ -21,8 +23,8 @@ from dynamic_characterization.options import CharacterizationOptions
 from dynamic_characterization.prospective import set_scenario
 
 CCF = ar6_core.ccf_parameters()
-AR6 = {"parameter_set": "ar6"}
-OPTIONS = CharacterizationOptions(parameter_set="ar6")
+AR6 = {"parameter_set": "ar6", "prospective_method": "ar6"}
+OPTIONS = CharacterizationOptions(parameter_set="ar6", prospective_method="ar6")
 DATE = pd.Timestamp("2030-01-01")
 
 
@@ -104,7 +106,7 @@ def test_ch4_and_n2o_follow_the_scenario(scenario):
 
 
 def test_gases_without_co2_terms_do_not_depend_on_the_scenario(scenario):
-    options = CharacterizationOptions(parameter_set="ar6", climate_carbon_feedback=False)
+    options = CharacterizationOptions(parameter_set="ar6", prospective_method="ar6", climate_carbon_feedback=False)
     cf4 = prospective_function("75-73-0", options=options)
     assert cf4.agwp_for(DATE, 100) == pytest.approx(float(ar6_core.agwp(gases.halocarbon("75-73-0"), 100.0)), rel=1e-12)
 
@@ -112,7 +114,7 @@ def test_gases_without_co2_terms_do_not_depend_on_the_scenario(scenario):
 def test_near_term_values_are_close_to_ar6():
     """In a low-emission scenario around 2030 the background is close to AR6's (2019)."""
     set_scenario(iam="IMAGE", ssp="SSP1", rcp="2.6")
-    co2 = ar6_prospective.characterize_co2_ar6_prospective
+    co2 = ar6_prospective.co2_function("ar6")
     ch4 = prospective_function("CH4", "fossil").agwp_for(DATE, 100) / co2.agwp_for(DATE, 100)
     n2o = prospective_function("N2O").agwp_for(DATE, 100) / co2.agwp_for(DATE, 100)
     assert ch4 == pytest.approx(29.8, rel=0.05)
@@ -171,7 +173,7 @@ def test_prospective_metrics(metric, method):
     assert by_flow[ids["co2"]] == pytest.approx(2.0, rel=1e-12)
     assert by_flow[ids["co2_in_air"]] == pytest.approx(-2.0, rel=1e-12)
     functions = create_characterization_functions_from_method(METHOD, use_prospective=True, characterization_options=AR6)
-    reference = getattr(ar6_prospective.characterize_co2_ar6_prospective, method)(DATE, 100)
+    reference = getattr(ar6_prospective.co2_function("ar6"), method)(DATE, 100)
     for code in ("ch4", "n2o", "cf4", "h2"):
         expected = 2.0 * getattr(functions[ids[code]], method)(DATE, 100) / reference
         assert by_flow[ids[code]] == pytest.approx(expected, rel=1e-9), code
