@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+* CAS numbers are now normalised before the default characterization functions are matched to the halocarbon data (`decay_multipliers.json`). Zero padding (`000075-38-7` vs `75-38-7`) and stray whitespace in the data keys (`"000375-17-7 "`, `"0 5595-10-8"`) no longer prevent a match. In ecoinvent 3.12 this adds "Vinylidene fluoride" and "Methyl vinyl ketone", which were previously left uncharacterized. HFO-1234ze(E), listed in the data with a CAS typo (`29188-24-9`), is also found under its correct CAS `29118-24-9`. New helpers: `dynamic_characterization.flows.normalize_cas`, `is_valid_cas`, `build_cas_index`.
+
 ## [1.4.3] - (2026-08-21)
 * Fixed prospective RF being constrained to after 2030 even if earlier data exists
 

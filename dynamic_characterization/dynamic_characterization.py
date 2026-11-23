@@ -14,6 +14,7 @@ import pandas as pd
 from bw2data.utils import UnknownObject
 
 from dynamic_characterization.classes import CharacterizedRow
+from dynamic_characterization.flows import build_cas_index, normalize_cas
 from dynamic_characterization.ipcc_ar6.radiative_forcing import (
     characterize_ch4,
     characterize_co,
@@ -420,6 +421,10 @@ def create_characterization_functions_from_method(
     with open(filepath) as json_file:
         decay_multipliers = json.load(json_file)
 
+    # The CAS numbers of biosphere flows and of the data keys are not formatted
+    # consistently (zero padding, stray whitespace), so both are normalised before matching.
+    decay_multipliers_by_cas = build_cas_index(decay_multipliers)
+
     # look up which GHGs are characterized in the selected static LCA method
     method_data = bd.Method(base_lcia_method).load()
 
@@ -506,9 +511,9 @@ def create_characterization_functions_from_method(
         else:
             # Other GHGs from decay_multipliers are not available in Watanabe module
             if not use_prospective or fallback_to_ipcc:
-                cas_number = node.get("CAS number")
-                if cas_number:
-                    decay_series = decay_multipliers.get(cas_number)
+                key = decay_multipliers_by_cas.get(normalize_cas(node.get("CAS number")))
+                if key is not None:
+                    decay_series = decay_multipliers[key]
                     if decay_series is not None:
                         characterization_functions[node.id] = (
                             create_generic_characterization_function(np.array(decay_series))
