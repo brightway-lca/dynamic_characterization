@@ -84,7 +84,7 @@ DECAY_MULTIPLIERS = os.path.join(
 
 
 def _halocarbon_function(cas_key):
-    with open(DECAY_MULTIPLIERS) as f:
+    with open(DECAY_MULTIPLIERS, encoding="utf-8") as f:
         return create_generic_characterization_function(np.array(json.load(f)[cas_key]))
 
 

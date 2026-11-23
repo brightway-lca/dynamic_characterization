@@ -127,8 +127,8 @@ def render() -> str:
 if __name__ == "__main__":
     text = render()
     if "--check" in sys.argv:
-        with open(OUT) as f:
+        with open(OUT, encoding="utf-8") as f:
             sys.exit(0 if f.read() == text else 1)
-    with open(OUT, "w") as f:
+    with open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
     print(f"wrote {OUT}")

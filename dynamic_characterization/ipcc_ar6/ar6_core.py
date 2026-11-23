@@ -34,7 +34,7 @@ STEPS_PER_YEAR = 10
 @lru_cache(maxsize=None)
 def load_parameters() -> dict:
     """The AR6 parameters bundled in ``ipcc_ar6/data/ar6_parameters.json`` (see its ``_source``)."""
-    with open(_PARAMETER_FILE) as f:
+    with open(_PARAMETER_FILE, encoding="utf-8") as f:
         return json.load(f)
 
 

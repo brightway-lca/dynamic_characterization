@@ -56,7 +56,7 @@ def test_is_valid_cas():
 
 
 def test_every_data_key_is_indexed():
-    with open(DECAY_MULTIPLIERS) as f:
+    with open(DECAY_MULTIPLIERS, encoding="utf-8") as f:
         keys = list(json.load(f))
     index = build_cas_index(keys)
     assert set(index.values()) == set(keys)
@@ -64,7 +64,7 @@ def test_every_data_key_is_indexed():
 
 
 def test_data_keys_have_valid_check_digits_except_known_typos():
-    with open(DECAY_MULTIPLIERS) as f:
+    with open(DECAY_MULTIPLIERS, encoding="utf-8") as f:
         keys = list(json.load(f))
     invalid = {normalize_cas(k) for k in keys if not is_valid_cas(k)}
     assert invalid == set(KNOWN_CAS_TYPOS.values())
