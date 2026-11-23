@@ -448,7 +448,8 @@ def create_characterization_functions_from_method(
         Options for the default characterization functions, see
         :class:`dynamic_characterization.options.CharacterizationOptions`. With
         ``{"parameter_set": "ar6"}``, the functions reproduce the IPCC AR6 metrics and the
-        limitations listed above do not apply (CO is still characterized by its oxidation only).
+        limitations listed above do not apply; CO, VOC and H2 then also include their indirect
+        effects (ozone, CH4, sulfate, stratospheric water vapour), and NO/NOx can be added.
         Without options, ``"legacy"`` is used and a ``FutureWarning`` is issued once.
 
     Returns
