@@ -14,6 +14,7 @@ import pandas as pd
 from bw2data.utils import UnknownObject
 
 from dynamic_characterization.classes import CharacterizedRow
+from dynamic_characterization.flows import build_cas_index, normalize_cas
 from dynamic_characterization.ipcc_ar6.radiative_forcing import (
     characterize_ch4,
     characterize_co,
@@ -368,11 +369,20 @@ def create_characterization_functions_from_method(
     AR6 Chapter 7 decay curves. If use_prospective=True, uses Watanabe et al. (2026) functions
     for CO2, CH4, and N2O (requires scenario to be set first).
 
-    Please note: Currently, only CO2, CH4 and N2O include climate-carbon feedbacks.
-    This has not yet been added for other GHGs.
-    Refer to https://esd.copernicus.org/articles/8/235/2017/esd-8-235-2017.html for more info.
-    "Methane, non-fossil" is currently also excluded from the default characterization functions,
-    as it has a different static CF than fossil methane and we need to check the correct value.
+    Please note the limitations of these default functions compared with the IPCC AR6 metrics:
+
+    - No climate-carbon feedback is included for any non-CO2 gas (CH4, N2O, CO, halocarbons).
+      AR6 adds it to all its metrics (Section 7.6.1.3; Gasser et al. 2017,
+      https://doi.org/10.5194/esd-8-235-2017), so dynamic GWPs come out about 4-5 % lower.
+    - All CH4 flows ("Methane, fossil", "Methane, non-fossil", "Methane, from soil or biomass
+      stock") share one function. The CO2 from the oxidation of fossil methane is not included.
+    - CO is characterized by its oxidation to CO2 only; its ozone and methane effects are not
+      included.
+    - Other GHGs are matched by CAS number to the Hodnebrog et al. (2020) data, without the
+      rapid adjustment AR6 applies to CFC-11 and CFC-12.
+    - The returned annual forcing sums to the absolute GWP at ``time_horizon - 1`` years (the
+      cumulative forcing is evaluated at years 0 ... H-1), which also applies to the CO2 reference
+      of the GWP metric.
 
     Parameters
     ----------
@@ -419,6 +429,10 @@ def create_characterization_functions_from_method(
 
     with open(filepath) as json_file:
         decay_multipliers = json.load(json_file)
+
+    # The CAS numbers of biosphere flows and of the data keys are not formatted
+    # consistently (zero padding, stray whitespace), so both are normalised before matching.
+    decay_multipliers_by_cas = build_cas_index(decay_multipliers)
 
     # look up which GHGs are characterized in the selected static LCA method
     method_data = bd.Method(base_lcia_method).load()
@@ -506,9 +520,9 @@ def create_characterization_functions_from_method(
         else:
             # Other GHGs from decay_multipliers are not available in Watanabe module
             if not use_prospective or fallback_to_ipcc:
-                cas_number = node.get("CAS number")
-                if cas_number:
-                    decay_series = decay_multipliers.get(cas_number)
+                key = decay_multipliers_by_cas.get(normalize_cas(node.get("CAS number")))
+                if key is not None:
+                    decay_series = decay_multipliers[key]
                     if decay_series is not None:
                         characterization_functions[node.id] = (
                             create_generic_characterization_function(np.array(decay_series))
@@ -699,15 +713,14 @@ def _characterize_pgtp(
             time_varying_re=time_varying_re,
         )
     else:
-        # For other GHGs, fall back to using integrated RF as proxy
-        # This may not be as accurate but provides a fallback
-        radiative_forcing_ghg = _apply_characterization_function(
+        # GHGs outside the Watanabe module (IPCC AR6 fallback functions): AGTP from the
+        # function's radiative forcing, convolved with the same temperature response
+        agtp_gas = _agtp_from_radiative_forcing(
             char_func,
             row,
             dynamic_time_horizon,
             time_varying_re=time_varying_re,
         )
-        agtp_gas = radiative_forcing_ghg.amount.sum()
 
     # Calculate reference AGTP for 1 kg of CO2
     agtp_co2 = agtp.agtp_co2(
@@ -724,6 +737,44 @@ def _characterize_pgtp(
         flow=row.flow,
         activity=row.activity,
     )
+
+
+def _agtp_from_radiative_forcing(
+    char_func,
+    row,
+    time_horizon: int,
+    time_varying_re: bool = False,
+) -> float:
+    """
+    AGTP at ``time_horizon`` [K per unit emission] from a characterization function's RF.
+
+    Used for pGTP of GHGs that the Watanabe module does not cover. If the function provides
+    its own ``agtp(time_horizon)``, that is used. Otherwise the function is evaluated for a
+    unit emission and its annual forcing is convolved with the temperature response of
+    ``prospective.agtp`` (the same model and discretisation as ``agtp.agtp_co2``, so that the
+    pGTP ratio is consistent).
+
+    Assumes the convention of the IPCC AR6 functions in this package: element ``k`` of the
+    marginal forcing is the forcing integrated over year ``[k-1, k]`` (element 0 is zero).
+    """
+    if time_horizon <= 0:
+        return 0.0
+
+    own_agtp = getattr(char_func, "agtp", None)
+    if callable(own_agtp):
+        return float(own_agtp(time_horizon))
+
+    marginal = np.asarray(
+        _apply_characterization_function(
+            char_func,
+            row._replace(amount=1),
+            time_horizon + 1,
+            time_varying_re=time_varying_re,
+        ).amount,
+        dtype="float64",
+    )
+    years = np.arange(1, len(marginal))  # end of each forcing year
+    return float(np.sum(marginal[1:] * agtp._temperature_response(time_horizon - years)))
 
 
 def _characterize_prospective_radiative_forcing(

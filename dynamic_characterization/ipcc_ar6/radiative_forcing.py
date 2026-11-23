@@ -226,6 +226,9 @@ def characterize_co(
 
     This is exactly the same function as for CO2, it's just scaled by the ratio of molar masses of CO and CO2. This is because CO is very short-lived (lifetime ~2 months) and we assume that it completely reacts to CO2 within the first year.
 
+    Only this oxidation to CO2 is modelled. The indirect effects of CO on ozone and methane, which
+    make up most of its GWP in the literature (AR5 Table 8.A.4), are not included.
+
     Based on characterize_co2 from bw_temporalis, but updated numerical values from IPCC AR6 Ch7 & SM.
 
     Calculate the cumulative or marginal radiative forcing (CRF) from CO2 for each year in a given period.
@@ -281,8 +284,9 @@ def characterize_ch4(
     Based on characterize_methane from bw_temporalis, but updated numerical values from IPCC AR6 
     Ch7 & SM.
 
-    This DOES include indirect effects of CH4 on ozone and water vapor, but DOES NOT include the 
-    decay to CO2. Therefore, this also treats fossil and biogenic methane the same. For more info, 
+    This DOES include indirect effects of CH4 on ozone and water vapor, but DOES NOT include the
+    decay to CO2. Therefore, this also treats fossil and biogenic methane the same. It also DOES
+    NOT include the climate-carbon feedback that AR6 adds to its metrics. For more info,
     see IPCC AR6 Ch7 under "Carbon Cycle Responses and Other Indirect Contributions" on page 1014.
 
     If `cumulative` is True, the cumulative CRF is calculated. If `cumulative` is False, the 

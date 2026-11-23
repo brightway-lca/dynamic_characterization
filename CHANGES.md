@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+* CAS numbers are now normalised before the default characterization functions are matched to the halocarbon data (`decay_multipliers.json`). Zero padding (`000075-38-7` vs `75-38-7`) and stray whitespace in the data keys (`"000375-17-7 "`, `"0 5595-10-8"`) no longer prevent a match. In ecoinvent 3.12 this adds "Vinylidene fluoride" and "Methyl vinyl ketone", which were previously left uncharacterized. HFO-1234ze(E), listed in the data with a CAS typo (`29188-24-9`), is also found under its correct CAS `29118-24-9`. New helpers: `dynamic_characterization.flows.normalize_cas`, `is_valid_cas`, `build_cas_index`.
+* Fixed `pGTP` for GHGs outside the Watanabe module (CO and the halocarbons characterized with `fallback_to_ipcc=True`). The integrated radiative forcing was used as if it were an AGTP, and the emitted amount was applied twice, so results were far too large and grew with the square of the amount (e.g. CF4 pGTP100 ≈ 150 000 per kg instead of the order of the AR6 GTP100 of 9 744). The AGTP is now computed from the function's radiative forcing with the temperature response of the prospective module, consistent with the CO2 reference. A characterization function can provide its own `agtp(time_horizon)`, which is then used instead.
+
+### Documentation
+* Corrected the docstrings of `create_characterization_functions_from_method`, `characterize_ch4` and `characterize_co`: the default functions include no climate-carbon feedback for non-CO2 gases (the docstring claimed it for CH4 and N2O), "Methane, non-fossil" is characterized (with the same function as fossil methane), CO is characterized by its oxidation to CO2 only, and the forcing is integrated to `time_horizon - 1` years.
+
 ## [1.4.3] - (2026-08-21)
 * Fixed prospective RF being constrained to after 2030 even if earlier data exists
 
