@@ -143,6 +143,41 @@ def co2_from_decay(kg_co2: float, lifetime: float, name: str = "oxidation CO2") 
     return GasSpec(name=name, components=(Component(terms=tuple(terms), constant=constant),))
 
 
+def precursor_component(
+    steady_state_forcing: float,
+    response_time: float,
+    precursor_lifetime: float = 0.0,
+    ccf: Optional[CCFParameters] = None,
+) -> Component:
+    """
+    One forcing component of an indirect (precursor) emission, e.g. the ozone or CH4 change
+    caused by 1 kg of CO, VOC, H2 or NOx (Fuglestvedt et al. 2010, Eqs. 10-14; Aamaas et al.
+    2013; with a finite precursor lifetime as in Warwick et al. 2023, Eq. 5):
+
+        RF(t) = F_ss * (exp(-t / alpha_M) - exp(-t / alpha_p)) / (alpha_M - alpha_p)
+
+    ``steady_state_forcing`` (F_ss) is the forcing per unit sustained emission
+    [W m-2 per kg yr-1], which equals the AGWP of a 1 kg pulse at an infinite horizon.
+    ``response_time`` (alpha_M) is the time constant of the component (e.g. the CH4 perturbation
+    lifetime), ``precursor_lifetime`` (alpha_p) that of the precursor; either may be 0, in which
+    case the RF follows the other one alone.
+    """
+    if response_time < 0 or precursor_lifetime < 0:
+        raise ValueError("time constants must not be negative")
+    if response_time == 0 and precursor_lifetime == 0:
+        raise ValueError("response_time and precursor_lifetime cannot both be zero")
+    if np.isclose(response_time, precursor_lifetime, rtol=1e-9):
+        raise ValueError("response_time and precursor_lifetime must differ")
+    if precursor_lifetime == 0:
+        terms = ((steady_state_forcing / response_time, response_time),)
+    elif response_time == 0:
+        terms = ((steady_state_forcing / precursor_lifetime, precursor_lifetime),)
+    else:
+        c = steady_state_forcing / (response_time - precursor_lifetime)
+        terms = ((c, response_time), (-c, precursor_lifetime))
+    return Component(terms=terms, ccf=ccf)
+
+
 # --- analytic metrics of a sum of exponentials ---------------------------------------------
 
 

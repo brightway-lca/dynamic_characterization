@@ -18,6 +18,10 @@ SPECIES_BY_CAS = {
     "74-82-8": "CH4",
     "10024-97-2": "N2O",
     "630-08-0": "CO",
+    "1333-74-0": "H2",
+    "10102-43-9": "NO",
+    "10102-44-0": "NO2",
+    "11104-93-1": "NOx",
 }
 
 # exact (lower-case) names, for flows without a CAS number. Never match by substring:
@@ -38,11 +42,19 @@ SPECIES_BY_NAME = {
     "carbon monoxide, fossil": "CO",
     "carbon monoxide, non-fossil": "CO",
     "carbon monoxide, from soil or biomass stock": "CO",
+    "hydrogen": "H2",
+    "voc, volatile organic compounds": "VOC",
+    "nmvoc, non-methane volatile organic compounds": "VOC",
+    "nitric oxide": "NO",
+    "nitrogen dioxide": "NO2",
+    "nitrogen oxides": "NOx",
 }
+
+_NAMED_SPECIES = ("CO2", "CO2 uptake", "CH4", "N2O", "CO", "H2", "VOC", "NO", "NO2", "NOx")
 
 
 class FlowClass(NamedTuple):
-    species: Optional[str]  # "CO2", "CO2 uptake", "CH4", "N2O", "CO", a canonical CAS, or None
+    species: Optional[str]  # one of _NAMED_SPECIES, a canonical CAS, or None
     origin: Optional[str]  # "fossil", "non-fossil" or None (not stated in the flow name)
 
 
@@ -78,7 +90,7 @@ def classify_flow(node, options: Optional[CharacterizationOptions] = None) -> Fl
     override = options.override_for(node)
     if override:
         species = override.get("species", species)
-        if species not in (None, "CO2", "CO2 uptake", "CH4", "N2O", "CO"):
+        if species is not None and species not in _NAMED_SPECIES:
             species = normalize_cas(species) or species
         origin = override.get("origin", origin)
     return FlowClass(species, origin)
@@ -87,6 +99,7 @@ def classify_flow(node, options: Optional[CharacterizationOptions] = None) -> Fl
 def function_for(flow_class: FlowClass, options: CharacterizationOptions, flow_label: str = "") -> Optional[Callable]:
     """The ``"ar6"`` characterization function for a classified flow, or None."""
     ccf = ar6_core.ccf_parameters(options.ccf_parameters) if options.climate_carbon_feedback else None
+    precursor_ccf = ccf if options.precursor_ccf else None
     species, origin = flow_class
 
     if species is None:
@@ -113,7 +126,35 @@ def function_for(flow_class: FlowClass, options: CharacterizationOptions, flow_l
     elif species == "N2O":
         spec = gases.n2o(ccf=ccf)
     elif species == "CO":
-        spec = gases.co_oxidation()
+        if "CO" in options.include_precursors:
+            if origin is None:
+                origin = options.unspecified_origin
+            spec = gases.co(
+                origin=origin,
+                parameter_set=options.precursor_parameter_set("CO"),
+                biogenic_oxidation_co2="explicit" if options.biogenic_oxidation_co2 == "explicit" else "neutral",
+                ccf=precursor_ccf,
+            )
+        else:
+            spec = gases.co_oxidation()
+    elif species == "VOC":
+        if "VOC" not in options.include_precursors:
+            return None
+        spec = gases.voc(options.precursor_parameter_set("VOC"), ccf=precursor_ccf)
+    elif species == "H2":
+        if "H2" not in options.include_precursors:
+            return None
+        spec = gases.h2(options.precursor_parameter_set("H2"), ccf=precursor_ccf)
+    elif species in ("NO", "NO2", "NOx"):
+        if not options.include_nox:
+            return None
+        spec = gases.nox(
+            emitted_as="NO" if species == "NO" else "NO2",
+            parameter_set=options.precursor_parameter_set("NOx"),
+            nitrate=options.nox_nitrate,
+            nitrate_parameter_set=options.precursor_parameter_set("nitrate"),
+            ccf=precursor_ccf,
+        )
     else:
         spec = gases.halocarbon(species, ccf=ccf)
         if spec is None:
