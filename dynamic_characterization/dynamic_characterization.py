@@ -488,7 +488,7 @@ def create_characterization_functions_from_method(
         "decay_multipliers.json",
     )
 
-    with open(filepath) as json_file:
+    with open(filepath, encoding="utf-8") as json_file:
         decay_multipliers = json.load(json_file)
 
     # The CAS numbers of biosphere flows and of the data keys are not formatted

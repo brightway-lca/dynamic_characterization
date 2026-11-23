@@ -48,7 +48,7 @@ def published_tolerance(value):
 
 
 def _ar6_rows():
-    with open(AR6_TABLE, newline="") as f:
+    with open(AR6_TABLE, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     for row in rows:
         row["CAS"] = normalize_cas(row["CAS"].strip('="'))
@@ -64,7 +64,7 @@ HALOCARBON_ROWS_SM7 = [row for row in HALOCARBON_ROWS if row["CAS"] != SF6_CAS]
 
 def test_parameter_file_is_up_to_date():
     path = os.path.join(ROOT, "dynamic_characterization", "ipcc_ar6", "data", "ar6_parameters.json")
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         assert f.read() == BUILD_AR6_DATA.render(), "run python dev/build_ar6_data.py"
 
 

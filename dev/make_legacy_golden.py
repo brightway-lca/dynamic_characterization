@@ -40,7 +40,7 @@ Row = namedtuple("Row", ["date", "amount", "flow", "activity"])
 
 
 def named_functions():
-    with open(DECAY_MULTIPLIERS) as f:
+    with open(DECAY_MULTIPLIERS, encoding="utf-8") as f:
         decay_multipliers = json.load(f)
     functions = {
         "co2": characterize_co2,

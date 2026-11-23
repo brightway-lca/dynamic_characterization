@@ -343,11 +343,11 @@ if __name__ == "__main__":
     if "--check" in sys.argv:
         stale = []
         for path, text in outputs.items():
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 if f.read() != text:
                     stale.append(path)
         sys.exit(1 if stale else 0)
     for path, text in outputs.items():
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         print(f"wrote {path}")
