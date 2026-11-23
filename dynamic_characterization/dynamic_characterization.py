@@ -369,11 +369,20 @@ def create_characterization_functions_from_method(
     AR6 Chapter 7 decay curves. If use_prospective=True, uses Watanabe et al. (2026) functions
     for CO2, CH4, and N2O (requires scenario to be set first).
 
-    Please note: Currently, only CO2, CH4 and N2O include climate-carbon feedbacks.
-    This has not yet been added for other GHGs.
-    Refer to https://esd.copernicus.org/articles/8/235/2017/esd-8-235-2017.html for more info.
-    "Methane, non-fossil" is currently also excluded from the default characterization functions,
-    as it has a different static CF than fossil methane and we need to check the correct value.
+    Please note the limitations of these default functions compared with the IPCC AR6 metrics:
+
+    - No climate-carbon feedback is included for any non-CO2 gas (CH4, N2O, CO, halocarbons).
+      AR6 adds it to all its metrics (Section 7.6.1.3; Gasser et al. 2017,
+      https://doi.org/10.5194/esd-8-235-2017), so dynamic GWPs come out about 4-5 % lower.
+    - All CH4 flows ("Methane, fossil", "Methane, non-fossil", "Methane, from soil or biomass
+      stock") share one function. The CO2 from the oxidation of fossil methane is not included.
+    - CO is characterized by its oxidation to CO2 only; its ozone and methane effects are not
+      included.
+    - Other GHGs are matched by CAS number to the Hodnebrog et al. (2020) data, without the
+      rapid adjustment AR6 applies to CFC-11 and CFC-12.
+    - The returned annual forcing sums to the absolute GWP at ``time_horizon - 1`` years (the
+      cumulative forcing is evaluated at years 0 ... H-1), which also applies to the CO2 reference
+      of the GWP metric.
 
     Parameters
     ----------
