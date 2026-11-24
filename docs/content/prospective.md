@@ -244,6 +244,86 @@ pgtp_ch4 = agtp_ch4 / agtp_co2
 print(f"pGTP100 CH4: {pgtp_ch4:.1f}")  # ~3-6 depending on scenario
 ```
 
+## With the AR6 parameter set
+
+The prospective functions above cover the direct forcing of CO2, CH4 and N2O only. With
+`characterization_options={"parameter_set": "ar6"}`, the prospective metrics use complete
+metrics instead, evaluated with the scenario for the year of each emission:
+
+```python
+set_scenario(iam="MESSAGE", ssp="SSP2", rcp="4.5")
+
+characterize(
+    dynamic_inventory_df,
+    metric="pGWP",  # or "pGTP", "prospective_radiative_forcing"
+    base_lcia_method=method,
+    characterization_options={"parameter_set": "ar6"},
+)
+```
+
+### Method `"watanabe2026"` (default)
+
+CO2, CH4 and N2O are computed as in Barbosa Watanabe & Cherubini (2026), following the paper's
+code (SI `es5c12391_si_028.pdf`, Code #3–#10, ported in `prospective.watanabe2026`), with two
+errors of that code corrected:
+
+- CH4: scenario RE plus the AR6 ozone and stratospheric water vapour terms (1.4e-4 and 0.4e-4
+  W m⁻² ppb⁻¹); N2O: scenario RE plus ozone (5.5e-4) and the CH4 effect (−1.7 × CH4);
+- a climate–carbon feedback (Gasser et al. 2017) driven by an annual two-layer temperature model,
+  which also gives the AGTP;
+- annual trapezoidal integration; GWP_H and GTP_H are the gas value divided by the CO2 value at
+  year H. The paper does not distinguish fossil and non-fossil CH4.
+
+Corrected errors of the published code:
+
+- in the CH4 scripts and the N2O AGWP script, the second and third feedback boxes decayed from
+  the previous value of the first box; here every box decays from its own value (as in the N2O
+  AGTP script);
+- the CO2 impulse response was chosen by the position of the scenario among the IAM's scenarios,
+  not by its RCP, which picked the wrong response for AIM and IMAGE (e.g. RCP6.0 for
+  IMAGE-SSP1-8.5); here the scenario's own RCP is used.
+
+With both errors restored, the port reproduces every value of the paper's SI tables within their
+rounding (this was checked when it was written). With the corrections, the values differ from the
+tables where the errors act: CH4 pGWP100 by −2 to +7 % and CH4 pGTP100 by +16 to +34 % in the
+scenarios checked (2030); N2O pGTP of GCAM4, MESSAGE and REMIND, which neither error affects, still
+equals the tables.
+
+All other gases (halocarbons, CO, VOC, H2, optionally NOx) keep their AR6 or literature forcing;
+their CO2 terms follow the same scenario CO2 response, and their AGTP uses the same temperature
+scheme, so that the CO2 reference is consistent.
+
+### Method `"ar6"`
+
+`{"parameter_set": "ar6", "prospective_method": "ar6"}` applies the AR6 recipe to the scenario
+inputs: CH4 and N2O with the AR6 tropospheric adjustments (−14 %, +7 %), the AR6 climate–carbon
+feedback and temperature response, fossil/non-fossil CH4 with oxidation CO2, and the CO2 response
+of the scenario's own RCP.
+
+### Examples
+
+pGWP100 per kg emitted in 2030 / 2070:
+
+| scenario | CH4, fossil | N2O | CF4 | H2 |
+|---|---|---|---|---|
+| **`watanabe2026`** | | | | |
+| IMAGE-SSP1-2.6 | 32.3 / 38.8 | 266 / 267 | 7319 / 7917 | 11.3 / 12.2 |
+| MESSAGE-SSP2-4.5 | 30.4 / 38.8 | 259 / 296 | 7094 / 8746 | 10.9 / 13.6 |
+| REMIND-SSP5-8.5 | 27.7 / 37.1 | 242 / 362 | 6619 / 10208 | 10.2 / 16.0 |
+| **`ar6`** | | | | |
+| IMAGE-SSP1-2.6 | 29.0 / 34.5 | 285 / 291 | 7323 / 7921 | 11.3 / 12.2 |
+| MESSAGE-SSP2-4.5 | 27.5 / 35.0 | 278 / 322 | 7098 / 8751 | 10.9 / 13.6 |
+| REMIND-SSP5-8.5 | 25.4 / 34.3 | 260 / 392 | 6622 / 10213 | 10.2 / 16.0 |
+| AR6 (no scenario) | 29.8 | 273 | 7380 | 11.4 |
+
+### Limitations
+
+- Time horizons up to 100 years (the length of the scenario CO2 impulse response); longer ones
+  raise an error.
+- `time_varying_re=True` is not supported; the radiative efficiencies of the emission year are
+  used, as in the paper.
+- Emission years outside 2020–2150 are clamped, with a warning.
+
 ## Reference
 
 Watanabe, K., Nansai, K., Nakajima, K., & Gibon, T. (2015). **Prospective Characterization Factors for Assessing Climate Change Impacts in Life Cycle Assessments**. *Environmental Science & Technology*, 49(5), 2811-2819. https://doi.org/10.1021/acs.est.5b01118

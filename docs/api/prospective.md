@@ -29,3 +29,7 @@ Prospective characterization factors after Watanabe et al., using scenario-depen
 ## Data loading
 
 ::: dynamic_characterization.prospective.data_loader
+
+## Reproduction of Watanabe & Cherubini (2026)
+
+::: dynamic_characterization.prospective.watanabe2026
