@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Version 2.0.0. The call syntax of 1.x is unchanged; the results change. See "Migrating to 2.0" in the usage documentation.
+
+### Changed (breaking: results)
+* The default characterization functions are those of the `"ar6"` parameter set of 1.5 (IPCC AR6 metrics, indirect gases). GWP100 rises, e.g. fossil CH4 26.7 -> 29.8, N2O 263.6 -> 273, CF4 7058 -> 7380; H2 and VOC are characterized; the forcing of the first year is stamped at the emission date.
+* The public names `ipcc_ar6.characterize_co2`, `characterize_co2_uptake`, `characterize_ch4`, `characterize_n2o` and `characterize_co` are the AR6 functions (`characterize_ch4`: fossil CH4; `characterize_co`: fossil CO with its indirect effects).
+* Prospective metrics: CO2, CH4 and N2O follow Barbosa Watanabe & Cherubini (2026), corrected, by default (1.x: direct forcing only). `prospective.agwp`, `prospective.agtp` and `prospective.radiative_forcing` keep their signatures and use this method.
+* `time_varying_re=True` is supported by the Watanabe method (radiative efficiencies follow the scenario over the response); prospective horizons beyond 100 years are truncated with a warning instead of an error. Missing radiative efficiencies (REMIND CH4 after 2100) take the last available value.
+
+### Removed
+* The 1.x characterization functions and `ipcc_ar6/data/decay_multipliers.json` (with the notebooks that generated it); the `"legacy"` parameter set (`characterization_options={"parameter_set": "legacy"}` raises a `ValueError`; `"ar6"` is accepted without effect) and the `FutureWarning` that announced the change.
+
+## [1.5.0] - (unreleased)
+
 ### Added
 * New parameter set `"ar6"` for the default characterization functions, selected with the new argument `characterization_options={"parameter_set": "ar6"}` of `characterize` and `create_characterization_functions_from_method`. It reproduces the IPCC AR6 emission metrics (WG1 Ch. 7, Tables 7.15 and 7.SM.7): climate-carbon feedback for non-CO2 gases (Gasser et al. 2017; mean, upper and lower parameter sets), fossil and non-fossil CH4 with the CO2 from oxidation, N2O with its ozone and CH4 effects, the CFC-11/12 adjustment, the SF6 lifetime of Table 7.15, AR6 radiative efficiencies of CO2, CH4 and N2O, and annual forcing that adds up to AGWP(H). GWP100 then matches the static IPCC 2021 factors, e.g. fossil CH4 29.8 (legacy 26.7), N2O 273 (263.6), CF4 7380 (7058). Further options: `climate_carbon_feedback`, `ccf_parameters`, `biogenic_oxidation_co2`, `ch4_oxidation_yield`, `unspecified_origin`, `flow_overrides`. Not yet available for the prospective metrics.
 * Indirect gases in the `"ar6"` parameter set, from published parameter sets (`ipcc_ar6/data/precursor_parameters.json`): CO (default Fry et al. 2012 multi-model mean, GWP100 1.63, plus 1.57 oxidation CO2 if fossil), VOC (Fry et al. 2012, 4.50 per kg VOC), H2 (Warwick et al. 2023, 11.4; or Sand et al. 2023), and opt-in NO/NO2/"Nitrogen oxides" (Fry et al. 2012) with optional nitrate aerosol. New options `include_precursors`, `precursor_parameter_sets`, `include_nox`, `nox_nitrate`, `precursor_ccf`.

@@ -1,6 +1,8 @@
-Dynamic characterization functions as originally created for bw_timex. These base on the IPCC's AR6 and cover the radiative forcing for the 247 GHGs considered there.
+Dynamic characterization functions based on the IPCC AR6 emission metrics (the defaults of the
+package since version 2.0), covering CO2, CH4, N2O, all halocarbons of AR6 Table 7.SM.7, and the
+indirect effects of CO, VOC, H2 and NOx.
 
-## `"ar6"` parameter set
+## Formulation
 
 `ar6_core.py`, `gases.py` and `make_characterization_function` in `radiative_forcing.py`
 reproduce the IPCC AR6 WG1 emission metrics (Forster et al. 2021, Section 7.6 and 7.SM.5,
@@ -19,7 +21,6 @@ Data:
 - `data/hodnebrog20.csv`: halocarbon lifetimes, radiative efficiencies and molar masses
   (Hodnebrog et al. 2020); identical to the input file of the AR6 code. Two blank CAS numbers
   are taken from AR6 Table 7.SM.7 and one CAS typo is corrected (see `gases.py`, `flows.py`).
-- `data/decay_multipliers.json`: precomputed forcing series of the `"legacy"` functions.
 
 Differences from the AR6 code (Table 7.SM.7):
 

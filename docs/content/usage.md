@@ -69,24 +69,16 @@ The `characterize()` function supports the following metrics:
 
 For the prospective metrics (`pGWP`, `pGTP`), you need to set a background scenario first. See [Prospective Characterization](prospective.md) for details.
 
-## IPCC AR6 parameter set
+## Default characterization functions (IPCC AR6)
 
-By default, the characterization functions are those of dynamic_characterization ≤ 1.4
-(`parameter_set="legacy"`). They give lower GWPs than the IPCC AR6 metrics, because they leave
-out the climate–carbon feedback of non-CO2 gases and the CO2 from fossil-methane oxidation, and
-because their annual forcing only adds up to AGWP(H − 1). The `"ar6"` parameter set reproduces
-the AR6 metrics (WG1 Ch. 7, Tables 7.15 and 7.SM.7):
+The default characterization functions reproduce the IPCC AR6 emission metrics (WG1 Ch. 7,
+Tables 7.15 and 7.SM.7); no option is needed:
 
 ```python
-characterize(
-    dynamic_inventory_df,
-    metric="GWP",
-    base_lcia_method=method,
-    characterization_options={"parameter_set": "ar6"},
-)
+characterize(dynamic_inventory_df, metric="GWP", base_lcia_method=method)
 ```
 
-| flow | static (IPCC 2021) | `legacy` | `ar6` |
+| flow | static (IPCC 2021) | ≤ 1.x | 2.0 |
 |---|---|---|---|
 | Methane, fossil | 29.8 | 26.7 | 29.8 |
 | Methane, non-fossil | 27.0 | 26.7 | 27.0 |
@@ -101,15 +93,15 @@ GWP100 per kg. All halocarbons of AR6 Table 7.SM.7 are reproduced within the tab
 except SF6, which follows Table 7.15 (lifetime 1000 yr, GWP100 24 300) like the static methods.
 Against the ecoinvent 3.12 "IPCC 2021, climate change: total (excl. biogenic CO2)" GWP100 method,
 184 of its 189 flows agree within 1 %; the other five have factors rounded to one significant
-digit (butane 0.006, tetrafluoroethene 0.004).
-In the `"ar6"` set:
+digit (butane 0.006, tetrafluoroethene 0.004). The functions include:
 
-- non-CO2 gases include the climate–carbon feedback (Gasser et al. 2017);
-- fossil CH4 adds the CO2 from its oxidation; non-fossil CH4 follows the AR6 convention;
-- N2O includes its effects on ozone and on methane;
-- CFC-11 and CFC-12 get the +12 % tropospheric adjustment;
-- the forcing stamped at `date + k` years is the forcing of the year starting then, so the
-  annual values add up to AGWP(H). The CO2 reference of the GWP metric uses the same convention.
+- the climate–carbon feedback of non-CO2 gases (Gasser et al. 2017);
+- the CO2 from the oxidation of fossil CH4; non-fossil CH4 follows the AR6 convention;
+- the effects of N2O on ozone and methane, and the +12 % adjustment of CFC-11 and CFC-12;
+- the indirect effects of CO, VOC and H2 (see below);
+- annual forcing in the convention: the value stamped at `date + k` years is the forcing of the
+  year starting then, so the annual values add up to AGWP(H). The CO2 reference of the GWP metric
+  uses the same convention.
 
 Flows are matched by CAS number first and then by exact name. "Methane, from soil or biomass
 stock" counts as fossil, as in the ecoinvent IPCC 2021 method.
@@ -118,7 +110,6 @@ Options (all are keys of `characterization_options`; see `CharacterizationOption
 
 | option | default | meaning |
 |---|---|---|
-| `parameter_set` | `"legacy"` | `"legacy"` or `"ar6"` |
 | `climate_carbon_feedback` | `True` | climate–carbon feedback for non-CO2 gases |
 | `ccf_parameters` | `"gasser2017_mean"` | or `"gasser2017_upper"` / `"gasser2017_lower"` (±1 SD) |
 | `biogenic_oxidation_co2` | `"ar6"` | non-fossil CH4: `"ar6"` (27.0), `"neutral"` (CH4 pulse only, 27.9) or `"explicit"` (oxidation CO2 counted, uptake modelled in the inventory, 29.8) |
@@ -127,11 +118,8 @@ Options (all are keys of `characterization_options`; see `CharacterizationOption
 | `flow_overrides` | `{}` | `{flow id or (database, code): {"species": ..., "origin": ...}}` |
 
 `compare_with_static(method, time_horizon, characterization_options)` returns a table of the
-static factor and the dynamic GWP of every flow of a method.
-
-Without `characterization_options`, a `FutureWarning` announces that the default will change to
-`"ar6"` in version 2.0. With the prospective metrics, the `"ar6"` set follows the chosen
-scenario; see [Prospective Characterization](prospective.md#with-the-ar6-parameter-set).
+static factor and the dynamic GWP of every flow of a method. With the prospective metrics, the
+functions follow the chosen scenario; see [Prospective Characterization](prospective.md).
 
 ### Indirect gases (CO, VOC, H2, NOx)
 
@@ -166,3 +154,27 @@ lifetime of Warwick et al. (2023) where it matters (H2).
 | `include_nox` | `False` | characterize NO, NO2, "Nitrogen oxides" |
 | `nox_nitrate` | `False` | add nitrate aerosol (needs `include_nox`) |
 | `precursor_ccf` | `False` | climate–carbon feedback for the precursors |
+
+## Migrating to 2.0
+
+Version 2.0 keeps the call syntax of 1.x (`characterize()` arguments, metric names, and the public
+function names) but changes the results:
+
+- **Default functions**: the IPCC AR6 functions above replace the simplified ones of 1.x (no
+  climate–carbon feedback, no oxidation CO2 of fossil CH4, CO as oxidation only, annual forcing
+  summed to H − 1). GWP100 rises, e.g. fossil CH4 26.7 → 29.8, N2O 263.6 → 273, CF4 7058 → 7380;
+  H2 and VOC are now characterized, NO/NOx on request (`include_nox=True`).
+- **Time convention**: the forcing of the first year is stamped at the emission date (1.x: zero at
+  the emission date, the first year's forcing one year later).
+- **Public names** keep working and point to the new functions: `ipcc_ar6.characterize_co2`,
+  `characterize_co2_uptake`, `characterize_n2o`, `characterize_ch4` (fossil CH4) and
+  `characterize_co` (fossil CO incl. indirect effects). `create_generic_characterization_function`
+  is unchanged.
+- **Prospective metrics**: CO2, CH4 and N2O follow Barbosa Watanabe & Cherubini (2026), with
+  indirect effects and climate–carbon feedback (1.x: direct forcing only; CH4 pGWP100 rises from
+  about 18–20 to about 30). `prospective.agwp`, `prospective.agtp` and
+  `prospective.radiative_forcing` keep their signatures. Horizons beyond 100 years are truncated
+  with a warning, as before.
+- **Removed**: the 1.x functions and their data (`ipcc_ar6/data/decay_multipliers.json`), and the
+  `"legacy"` parameter set of 1.5 (`characterization_options={"parameter_set": "legacy"}` raises;
+  `"ar6"` is accepted and has no effect).

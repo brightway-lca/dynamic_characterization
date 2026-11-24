@@ -235,31 +235,19 @@ agwp_ch4 = agwp.agwp_ch4(emission_year=2030, time_horizon=100)
 
 # Calculate pGWP
 pgwp_ch4 = agwp_ch4 / agwp_co2
-print(f"pGWP100 CH4: {pgwp_ch4:.1f}")  # ~21-28 depending on scenario
+print(f"pGWP100 CH4: {pgwp_ch4:.1f}")  # ~27-32 for 2030, depending on scenario
 
 # Same for GTP
 agtp_co2 = agtp.agtp_co2(emission_year=2030, time_horizon=100)
 agtp_ch4 = agtp.agtp_ch4(emission_year=2030, time_horizon=100)
 pgtp_ch4 = agtp_ch4 / agtp_co2
-print(f"pGTP100 CH4: {pgtp_ch4:.1f}")  # ~3-6 depending on scenario
+print(f"pGTP100 CH4: {pgtp_ch4:.1f}")  # ~5-8 for 2030, depending on scenario
 ```
 
-## With the AR6 parameter set
+## Method
 
-The prospective functions above cover the direct forcing of CO2, CH4 and N2O only. With
-`characterization_options={"parameter_set": "ar6"}`, the prospective metrics use complete
-metrics instead, evaluated with the scenario for the year of each emission:
-
-```python
-set_scenario(iam="MESSAGE", ssp="SSP2", rcp="4.5")
-
-characterize(
-    dynamic_inventory_df,
-    metric="pGWP",  # or "pGTP", "prospective_radiative_forcing"
-    base_lcia_method=method,
-    characterization_options={"parameter_set": "ar6"},
-)
-```
+The prospective metrics cover all gases of the method, evaluated with the scenario for the year of
+each emission. Two methods are available (option `prospective_method`):
 
 ### Method `"watanabe2026"` (default)
 
@@ -295,7 +283,7 @@ scheme, so that the CO2 reference is consistent.
 
 ### Method `"ar6"`
 
-`{"parameter_set": "ar6", "prospective_method": "ar6"}` applies the AR6 recipe to the scenario
+`characterization_options={"prospective_method": "ar6"}` applies the AR6 recipe to the scenario
 inputs: CH4 and N2O with the AR6 tropospheric adjustments (−14 %, +7 %), the AR6 climate–carbon
 feedback and temperature response, fossil/non-fossil CH4 with oxidation CO2, and the CO2 response
 of the scenario's own RCP.
@@ -318,15 +306,16 @@ pGWP100 per kg emitted in 2030 / 2070:
 
 ### Limitations
 
-- Time horizons up to 100 years (the length of the scenario CO2 impulse response); longer ones
-  raise an error.
-- `time_varying_re=True` is not supported; the radiative efficiencies of the emission year are
-  used, as in the paper.
+- Time horizons up to 100 years (the length of the scenario CO2 impulse response); longer ones are
+  truncated to 100 years, with a warning.
+- `time_varying_re=True` (see above) is supported by `"watanabe2026"`; the `"ar6"` method uses the
+  radiative efficiencies of the emission year and warns.
+- REMIND has CH4 radiative efficiencies up to 2100 only; later years use the 2100 value.
 - Emission years outside 2020–2150 are clamped, with a warning.
 
 ## Reference
 
-Watanabe, K., Nansai, K., Nakajima, K., & Gibon, T. (2015). **Prospective Characterization Factors for Assessing Climate Change Impacts in Life Cycle Assessments**. *Environmental Science & Technology*, 49(5), 2811-2819. https://doi.org/10.1021/acs.est.5b01118
+Barbosa Watanabe, M. D., & Cherubini, F. (2026). *Environmental Science & Technology*, 60, 3202-3215. https://doi.org/10.1021/acs.est.5c12391 (method and data; the metric code of its Supporting Information is ported in `prospective.watanabe2026`, with two errors of that code corrected).
 
 ### Data Sources
 
