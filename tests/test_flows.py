@@ -1,6 +1,6 @@
 """CAS normalisation and the CAS-based lookup of the default characterization functions."""
 
-import json
+import csv
 import os
 
 import bw2data as bd
@@ -18,13 +18,19 @@ from dynamic_characterization.flows import (
     normalize_cas,
 )
 
-DECAY_MULTIPLIERS = os.path.join(
+HALOCARBON_TABLE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "dynamic_characterization",
     "ipcc_ar6",
     "data",
-    "decay_multipliers.json",
+    "hodnebrog20.csv",
 )
+
+
+def _table_cas_numbers():
+    """CAS numbers of the gases with a lifetime in the halocarbon table, as written there."""
+    with open(HALOCARBON_TABLE, newline="", encoding="utf-8-sig") as f:
+        return [row["CASRN"] for row in csv.DictReader(f) if row["CASRN"] and row["Lifetime (yr)"]]
 
 
 @pytest.mark.parametrize(
@@ -33,8 +39,8 @@ DECAY_MULTIPLIERS = os.path.join(
         ("000124-38-9", "124-38-9"),  # ecoinvent zero padding
         ("124-38-9", "124-38-9"),
         ("75-38-7", "75-38-7"),  # vinylidene fluoride, unpadded in ecoinvent 3.12
-        ("000375-17-7 ", "375-17-7"),  # trailing space (key in decay_multipliers.json)
-        ("0 5595-10-8", "5595-10-8"),  # inner space (key in decay_multipliers.json)
+        ("000375-17-7 ", "375-17-7"),  # trailing space
+        ("0 5595-10-8", "5595-10-8"),  # inner space
         ("1309353-34-1", "1309353-34-1"),  # seven-digit first group
         ("0001309353-34-1", "1309353-34-1"),
     ],
@@ -55,18 +61,15 @@ def test_is_valid_cas():
     assert is_valid_cas("29118-24-9")
 
 
-def test_every_data_key_is_indexed():
-    with open(DECAY_MULTIPLIERS, encoding="utf-8") as f:
-        keys = list(json.load(f))
+def test_every_table_cas_number_is_indexed():
+    keys = _table_cas_numbers()
     index = build_cas_index(keys)
     assert set(index.values()) == set(keys)
     assert len(index) == len(keys) + len(KNOWN_CAS_TYPOS)
 
 
-def test_data_keys_have_valid_check_digits_except_known_typos():
-    with open(DECAY_MULTIPLIERS, encoding="utf-8") as f:
-        keys = list(json.load(f))
-    invalid = {normalize_cas(k) for k in keys if not is_valid_cas(k)}
+def test_table_cas_numbers_have_valid_check_digits_except_known_typos():
+    invalid = {normalize_cas(k) for k in _table_cas_numbers() if not is_valid_cas(k)}
     assert invalid == set(KNOWN_CAS_TYPOS.values())
 
 

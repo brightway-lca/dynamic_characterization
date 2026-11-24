@@ -8,7 +8,6 @@ import pandas as pd
 import pytest
 from bw2data.tests import bw2test
 
-import dynamic_characterization.dynamic_characterization as dc
 from dynamic_characterization import CharacterizationOptions, characterize, compare_with_static
 from dynamic_characterization.dynamic_characterization import (
     clear_characterization_function_cache,
@@ -74,11 +73,14 @@ def test_compare_with_static_matches_ar6_factors():
 
 
 @bw2test
-def test_compare_with_static_legacy_reproduces_known_gap():
-    ids = setup_project()
-    table = compare_with_static(METHOD, 100, {"parameter_set": "legacy"}).set_index("flow")
-    assert table.loc[ids["ch4_fossil"], "dynamic_gwp"] == pytest.approx(26.71, abs=0.01)
-    assert table.loc[ids["n2o"], "dynamic_gwp"] == pytest.approx(263.6, abs=0.1)
+def test_defaults_are_the_ar6_set():
+    """Without options, the functions are those of {"parameter_set": "ar6"} (the only set since 2.0)."""
+    setup_project()
+    default = compare_with_static(METHOD, 100)
+    explicit = compare_with_static(METHOD, 100, AR6)
+    pd.testing.assert_frame_equal(default, explicit)
+    with pytest.raises(ValueError, match="legacy"):
+        create_characterization_functions_from_method(METHOD, characterization_options={"parameter_set": "legacy"})
 
 
 @bw2test
@@ -128,12 +130,11 @@ def test_options_change_the_functions():
     no_ccf = create_characterization_functions_from_method(
         METHOD, characterization_options=dict(AR6, climate_carbon_feedback=False)
     )
-    legacy = create_characterization_functions_from_method(
-        METHOD, characterization_options={"parameter_set": "legacy"}
-    )
+    default = create_characterization_functions_from_method(METHOD)
     assert plain[ids["n2o"]] is not no_ccf[ids["n2o"]]
     assert plain[ids["n2o"]].agwp(100) > no_ccf[ids["n2o"]].agwp(100)
-    assert legacy[ids["co2_fossil"]] is characterize_co2
+    assert default[ids["co2_fossil"]] is characterize_co2
+    assert default[ids["n2o"]] is plain[ids["n2o"]]
 
 
 def inventory(ids):
@@ -178,16 +179,11 @@ def test_vectorized_radiative_forcing_equals_row_loop():
 
 
 @bw2test
-def test_future_warning_once_without_options(monkeypatch):
+def test_no_warning_without_options():
     setup_project()
-    monkeypatch.setattr(dc, "_DEFAULT_PARAMETER_SET_WARNED", False)
-    with pytest.warns(FutureWarning, match="parameter_set"):
-        create_characterization_functions_from_method(METHOD)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        clear_characterization_function_cache()
-        create_characterization_functions_from_method(METHOD)  # only once per process
-        create_characterization_functions_from_method(METHOD, characterization_options={"parameter_set": "legacy"})
+        create_characterization_functions_from_method(METHOD)
 
 
 def test_option_validation():

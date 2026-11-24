@@ -17,7 +17,8 @@ es5c12391_si_028.pdf (Section 3, "public release version, November 2025"):
 The arithmetic, constants, time indexing and end-point treatment follow that code, apart from
 the two corrections listed below. In short:
 
-- RF of CH4 = (RE_CH4 + 1.4e-4 + 0.4e-4) x IRF (RE of the pulse year, fixed; the two constants
+- RF of CH4 = (RE_CH4 + 1.4e-4 + 0.4e-4) x IRF (RE of the pulse year, fixed, as in the paper;
+  optionally time-varying, see :func:`scenario_series`; the two constants
   are the AR6 ozone and stratospheric water vapour terms, no tropospheric adjustment of RE_CH4);
   RF of N2O = (RE_N2O + 5.5e-4 - 1.7 x (RE_CH4 + 1.8e-4)) x IRF; RF of CO2 = RE_CO2 x IRF.
 - Temperature: annual explicit two-layer model (C_s = 7.7, C_d = 147 W yr m-2 K-1,
@@ -57,7 +58,7 @@ import numpy as np
 
 from .config import get_scenario
 from .data_loader import load_irf_ch4, load_irf_co2, load_irf_n2o, load_re_ch4, load_re_co2, load_re_n2o
-from .radiative_forcing import _get_year_index
+from ._common import _get_year_index
 
 _SCALE = 1e12  # the paper's code works in pW m-2 kg-1 and pK kg-1
 
@@ -76,6 +77,14 @@ _N2O_CH4 = -1.7
 def _per_kg(molar_mass: float) -> float:
     """The code's ppb -> kg conversion: 1e9 * 1e-6 * M_air / M / 5.13252."""
     return 10**9 * 10**-6 * 28.97 / molar_mass / 5.13252
+
+
+def _at(re, t: int) -> float:
+    """Radiative efficiency at step ``t``: a constant, or element ``t`` of an annual series
+    (clamped to its last element)."""
+    if np.ndim(re) == 0:
+        return float(re)
+    return float(re[min(t, len(re) - 1)])
 
 
 def _temperature_step(T_s, T_d, forcing):
@@ -114,7 +123,7 @@ def _ccf_boxes(T_s, C):
 def agwp_co2_series(re_co2: float, irf_co2, integration_years: int = 125) -> np.ndarray:
     """AGWP of 1 kg CO2 [W m-2 yr kg-1]; element i belongs to calendar year pulse + i."""
     irf = np.asarray(irf_co2, dtype="float64")
-    rf = [re_co2 * irf[i] * _per_kg(44.01) for i in range(min(integration_years, len(irf)))]
+    rf = [_at(re_co2, i) * irf[i] * _per_kg(44.01) for i in range(min(integration_years, len(irf)))]
     agwp = [(rf[0] + rf[1]) / 2]
     for t in range(1, len(rf) - 1):
         agwp.append(agwp[t - 1] + (rf[t] + rf[t + 1]) / 2)
@@ -134,11 +143,11 @@ def _ch4_chain(re_ch4: float, re_co2: float, irf_ch4) -> Tuple[list, list, list,
     C = (0.0, 0.0, 0.0)
     factor1, factor2, T_s_values, T_s_p_values = [], [], [], []
     for t in range(1, 102):
-        f1 = (re_ch4 + _CH4_INDIRECT) * 10**9 * (irf[t - 1] * constant)
+        f1 = (_at(re_ch4, t - 1) + _CH4_INDIRECT) * 10**9 * (irf[t - 1] * constant)
         T_s_new, T_d = _temperature_step(T_s, T_d, f1)
         T_s = T_s_new
         C = _ccf_boxes(T_s, C)
-        f2 = sum(C) * co2_constant * re_co2 * 10**9
+        f2 = sum(C) * co2_constant * _at(re_co2, t) * 10**9
         T_s_p, T_d_p = _temperature_step(T_s_p, T_d_p, f2)
         factor1.append(f1)
         factor2.append(f2)
@@ -176,12 +185,12 @@ def agwp_n2o_series(re_n2o: float, re_ch4: float, re_co2: float, irf_n2o) -> np.
     C = (0.0, 0.0, 0.0)
     factor1, factor2 = [], []
     for t in range(1, 101):
-        f1 = (re_n2o + _N2O_OZONE + _N2O_CH4 * (re_ch4 + _CH4_INDIRECT)) * 10**9 * (irf[t - 1] * constant)
+        f1 = (_at(re_n2o, t - 1) + _N2O_OZONE + _N2O_CH4 * (_at(re_ch4, t - 1) + _CH4_INDIRECT)) * 10**9 * (irf[t - 1] * constant)
         T_s_new, T_d = _temperature_step(T_s, T_d, f1)
         T_s = T_s_new
         C = _ccf_boxes(T_s, C)
         factor1.append(f1)
-        factor2.append(sum(C) * constant * re_co2 * 10**9)
+        factor2.append(sum(C) * constant * _at(re_co2, t) * 10**9)
     cumulative, agwp = 0.0, []
     for t in range(len(factor1) - 1):
         cumulative += (factor1[t] + factor1[t + 1]) / 2 + (factor2[t] + factor2[t + 1]) / 2
@@ -198,12 +207,12 @@ def agtp_n2o_series(re_n2o: float, re_ch4: float, re_co2: float, irf_n2o) -> np.
     T_s, T_d, T_s_p, T_d_p = [0.0] * n, [0.0] * n, [0.0] * n, [0.0] * n
     C = (0.0, 0.0, 0.0)
     for t in range(n):
-        f1 = (re_n2o + _N2O_OZONE + _N2O_CH4 * (re_ch4 + _CH4_INDIRECT)) * 10**9 * (irf[t] * constant)
+        f1 = (_at(re_n2o, t) + _N2O_OZONE + _N2O_CH4 * (_at(re_ch4, t) + _CH4_INDIRECT)) * 10**9 * (irf[t] * constant)
         f2 = 0.0
         if t > 0:
             T_s[t], T_d[t] = _temperature_step(T_s[t - 1], T_d[t - 1], f1)
             C = _ccf_boxes(T_s[t], C)
-            f2 = sum(C) * constant * re_co2 * 10**9
+            f2 = sum(C) * constant * _at(re_co2, t) * 10**9
         # T_s_prime[t - 1] is T_s_prime[-1] (= 0) for t = 0, as in the code
         T_s_p[t], T_d_p[t] = _temperature_step(T_s_p[t - 1], T_d_p[t - 1], f2)
     agtp = [(T_s[t] + T_s[t + 1]) / 2 + (T_s_p[t] + T_s_p[t + 1]) / 2 for t in range(n - 1)]
@@ -218,7 +227,7 @@ def agtp_n2o_series(re_n2o: float, re_ch4: float, re_co2: float, irf_n2o) -> np.
 def agtp_co2_series(re_co2: float, irf_co2, n_years: int = 100) -> np.ndarray:
     """AGTP of 1 kg CO2 [K kg-1] (Code #7), 100 values."""
     irf = np.asarray(irf_co2, dtype="float64")
-    rf = [re_co2 * irf[i] * _per_kg(44.01) for i in range(min(len(irf), n_years))]
+    rf = [_at(re_co2, i) * irf[i] * _per_kg(44.01) for i in range(min(len(irf), n_years))]
     T_s, T_d = [0.0], [0.0]
     for t in range(1, len(rf)):
         rf_value = rf[t - 1] if t > 1 else rf[0]
@@ -233,11 +242,30 @@ def agtp_co2_series(re_co2: float, irf_co2, n_years: int = 100) -> np.ndarray:
 # --- scenario data and the metrics (Code #6, #10) ---------------------------------------------
 
 
-def _re(loader, iam: str, ssp: str, rcp: str, year: int) -> float:
-    """RE of the pulse year; years outside the data are clamped with a warning, as elsewhere in the module."""
+def _forward_filled(series: np.ndarray) -> np.ndarray:
+    """Replace missing values by the last available one."""
+    if not np.isnan(series).any():
+        return series
+    filled = series.copy()
+    for i in range(1, filled.size):
+        if np.isnan(filled[i]):
+            filled[i] = filled[i - 1]
+    return filled
+
+
+def _re(loader, iam: str, ssp: str, rcp: str, year: int, time_varying_re: bool = False):
+    """
+    RE of the pulse year, or with ``time_varying_re`` the annual series from the pulse year on
+    (held at its last value, 2150, beyond the data). Pulse years outside the data are clamped
+    with a warning, as elsewhere in the module. Years without data (REMIND CH4 after 2100) take
+    the last available value.
+    """
     data = loader(iam)
-    series = data[ssp][rcp]
-    return float(series[min(_get_year_index(year, np.asarray(data["_years"])), len(series) - 1)])
+    series = _forward_filled(np.asarray(data[ssp][rcp], dtype="float64"))
+    index = min(_get_year_index(year, np.asarray(data["_years"])), len(series) - 1)
+    if not time_varying_re:
+        return float(series[index])
+    return series[index:]
 
 
 def co2_irf_key(rcp: str) -> str:
@@ -246,19 +274,26 @@ def co2_irf_key(rcp: str) -> str:
 
 
 @lru_cache(maxsize=None)
-def scenario_series(gas: str, metric: str, iam: str, ssp: str, rcp: str, year: int) -> np.ndarray:
-    """AGWP or AGTP series (``metric`` "agwp" / "agtp") of CO2, CH4 or N2O for a scenario and pulse year."""
-    re_co2 = _re(load_re_co2, iam, ssp, rcp, year)
+def scenario_series(
+    gas: str, metric: str, iam: str, ssp: str, rcp: str, year: int, time_varying_re: bool = False
+) -> np.ndarray:
+    """
+    AGWP or AGTP series (``metric`` "agwp" / "agtp") of CO2, CH4 or N2O for a scenario and pulse
+    year. With ``time_varying_re`` the radiative efficiencies follow the scenario over the
+    response (the RE of year ``pulse + t`` at time ``t``); otherwise, as in the paper, those of
+    the pulse year are used throughout.
+    """
+    re_co2 = _re(load_re_co2, iam, ssp, rcp, year, time_varying_re)
     irf_co2 = load_irf_co2()[co2_irf_key(rcp)]
     if gas == "CO2":
         series = agwp_co2_series(re_co2, irf_co2) if metric == "agwp" else agtp_co2_series(re_co2, irf_co2)
     elif gas == "CH4":
-        re_ch4 = _re(load_re_ch4, iam, ssp, rcp, year)
+        re_ch4 = _re(load_re_ch4, iam, ssp, rcp, year, time_varying_re)
         fn = agwp_ch4_series if metric == "agwp" else agtp_ch4_series
         series = fn(re_ch4, re_co2, load_irf_ch4())
     elif gas == "N2O":
-        re_n2o = _re(load_re_n2o, iam, ssp, rcp, year)
-        re_ch4 = _re(load_re_ch4, iam, ssp, rcp, year)
+        re_n2o = _re(load_re_n2o, iam, ssp, rcp, year, time_varying_re)
+        re_ch4 = _re(load_re_ch4, iam, ssp, rcp, year, time_varying_re)
         if metric == "agwp":
             series = agwp_n2o_series(re_n2o, re_ch4, re_co2, load_irf_n2o())
         else:
@@ -277,7 +312,7 @@ def _scenario(iam, ssp, rcp):
     return iam, ssp, rcp
 
 
-def pgwp(gas: str, year: int, time_horizon: int = 100, iam=None, ssp=None, rcp=None) -> float:
+def pgwp(gas: str, year: int, time_horizon: int = 100, iam=None, ssp=None, rcp=None, time_varying_re: bool = False) -> float:
     """
     pGWP of CH4 or N2O as in Code #6: gas AGWP / CO2 AGWP at row ``time_horizon - 1`` of the
     annual series (row 99 for GWP100). The scenario defaults to ``prospective.get_scenario()``.
@@ -285,16 +320,16 @@ def pgwp(gas: str, year: int, time_horizon: int = 100, iam=None, ssp=None, rcp=N
     if not 1 <= time_horizon <= 100:
         raise ValueError("time_horizon must be between 1 and 100 years")
     iam, ssp, rcp = _scenario(iam, ssp, rcp)
-    gas_series = scenario_series(gas, "agwp", iam, ssp, rcp, year)
-    co2_series = scenario_series("CO2", "agwp", iam, ssp, rcp, year)
+    gas_series = scenario_series(gas, "agwp", iam, ssp, rcp, year, time_varying_re)
+    co2_series = scenario_series("CO2", "agwp", iam, ssp, rcp, year, time_varying_re)
     return float(gas_series[time_horizon - 1] / co2_series[time_horizon - 1])
 
 
-def pgtp(gas: str, year: int, time_horizon: int = 100, iam=None, ssp=None, rcp=None) -> float:
+def pgtp(gas: str, year: int, time_horizon: int = 100, iam=None, ssp=None, rcp=None, time_varying_re: bool = False) -> float:
     """pGTP of CH4 or N2O as in Code #10: gas AGTP / CO2 AGTP at row ``time_horizon - 1``."""
     if not 1 <= time_horizon <= 100:
         raise ValueError("time_horizon must be between 1 and 100 years")
     iam, ssp, rcp = _scenario(iam, ssp, rcp)
-    gas_series = scenario_series(gas, "agtp", iam, ssp, rcp, year)
-    co2_series = scenario_series("CO2", "agtp", iam, ssp, rcp, year)
+    gas_series = scenario_series(gas, "agtp", iam, ssp, rcp, year, time_varying_re)
+    co2_series = scenario_series("CO2", "agtp", iam, ssp, rcp, year, time_varying_re)
     return float(gas_series[time_horizon - 1] / co2_series[time_horizon - 1])

@@ -5,7 +5,8 @@ from typing import Mapping, Optional, Tuple
 
 from dynamic_characterization.ipcc_ar6.gases import precursor_parameter_set
 
-PARAMETER_SETS = ("legacy", "ar6")
+PARAMETER_SETS = ("ar6",)
+_REMOVED_PARAMETER_SETS = ("legacy",)
 _RESERVED_PARAMETER_SETS = ("fair_irf",)
 ORIGINS = ("fossil", "non-fossil")
 BIOGENIC_OXIDATION_MODES = ("ar6", "neutral", "explicit")
@@ -21,59 +22,57 @@ class CharacterizationOptions:
     """
     Options for the default characterization functions.
 
-    Pass them as a dict, e.g. ``characterize(..., characterization_options={"parameter_set":
-    "ar6"})``; unknown keys raise a ``ValueError``.
+    Pass them as a dict, e.g. ``characterize(..., characterization_options={"include_nox":
+    True})``; unknown keys raise a ``ValueError``.
 
     Attributes
     ----------
-    parameter_set : {"legacy", "ar6"}
-        ``"legacy"`` (default) keeps the functions of dynamic_characterization <= 1.4.
-        ``"ar6"`` reproduces the IPCC AR6 metrics (WG1 Ch. 7, Tables 7.15 and 7.SM.7):
-        climate-carbon feedback for non-CO2 gases, separate fossil and non-fossil CH4
-        (with oxidation CO2), N2O with its ozone and CH4 effects, the CFC-11/12 adjustment, and
-        annual forcing that adds up to AGWP(H).
+    parameter_set : {"ar6"}
+        The IPCC AR6 metrics (WG1 Ch. 7, Tables 7.15 and 7.SM.7), the only parameter set since
+        version 2.0; accepted for compatibility with 1.5. The ``"legacy"`` functions of versions
+        <= 1.5 were removed.
     climate_carbon_feedback : bool
-        ``"ar6"`` only. Add the climate-carbon feedback to non-CO2 gases. Default True (AR6).
+        Add the climate-carbon feedback to non-CO2 gases. Default True (AR6).
     ccf_parameters : {"gasser2017_mean", "gasser2017_upper", "gasser2017_lower"}
-        ``"ar6"`` only. Gasser et al. (2017) parameter set; mean is AR6, upper/lower are +-1 SD.
+        Gasser et al. (2017) parameter set; mean is AR6, upper/lower are +-1 SD.
     biogenic_oxidation_co2 : {"ar6", "neutral", "explicit"}
-        ``"ar6"`` only. Treatment of the carbon in non-fossil CH4 (see
+        Treatment of the carbon in non-fossil CH4 (see
         ``ipcc_ar6.gases.ch4``). Default ``"ar6"`` (GWP100 27.0).
     ch4_oxidation_yield : float, optional
-        ``"ar6"`` only. Fraction of CH4 oxidised to CO2. Default None = AR6 value 0.75.
+        Fraction of CH4 oxidised to CO2. Default None = AR6 value 0.75.
     unspecified_origin : {"fossil", "non-fossil"}
-        ``"ar6"`` only. Origin assumed for CH4 flows without a fossil/non-fossil suffix.
+        Origin assumed for CH4 flows without a fossil/non-fossil suffix.
     flow_overrides : mapping
-        ``"ar6"`` only. ``{flow id or (database, code): {"species": ..., "origin": ...}}`` to
+        ``{flow id or (database, code): {"species": ..., "origin": ...}}`` to
         override the classification of individual flows. ``species`` is one of "CO2",
         "CO2 uptake", "CH4", "N2O", "CO", a CAS number, or None to leave the flow
         uncharacterized.
     include_precursors : collection of {"CO", "VOC", "H2"}
-        ``"ar6"`` only. Precursors characterized with their indirect forcing (ozone, CH4,
+        Precursors characterized with their indirect forcing (ozone, CH4,
         sulfate, stratospheric water vapour) from published parameter sets. Default: all three.
         CO not listed falls back to its oxidation CO2 only; VOC and H2 not listed are not
         characterized.
     precursor_parameter_sets : mapping
-        ``"ar6"`` only. ``{species: set name}`` for "CO", "VOC", "H2", "NOx", "nitrate"; see
+        ``{species: set name}`` for "CO", "VOC", "H2", "NOx", "nitrate"; see
         ``ipcc_ar6/data/precursor_parameters.json``. Defaults: CO and VOC "fry2012_4regions",
         H2 "warwick2023", NOx "fry2012_4regions", nitrate "bauer2007".
     include_nox : bool
-        ``"ar6"`` only. Characterize NO, NO2 and "Nitrogen oxides" (default False: sign and
+        Characterize NO, NO2 and "Nitrogen oxides" (default False: sign and
         size of the NOx metric are very uncertain).
     nox_nitrate : bool
-        ``"ar6"`` only, with ``include_nox``. Add the direct forcing of nitrate aerosol.
+        With ``include_nox``. Add the direct forcing of nitrate aerosol.
     precursor_ccf : bool
-        ``"ar6"`` only. Add the climate-carbon feedback to the precursors (the published sets
+        Add the climate-carbon feedback to the precursors (the published sets
         do not include it; AR6 adds it to all its metrics). Default False.
     prospective_method : {"watanabe2026", "ar6"}
-        ``"ar6"`` with the prospective metrics only. ``"watanabe2026"`` (default) computes CO2,
+        Prospective metrics only. ``"watanabe2026"`` (default) computes CO2,
         CH4 and N2O as Barbosa Watanabe & Cherubini (2026), with two errors of the published code
         corrected (see ``prospective.watanabe2026``);
         ``"ar6"`` applies the AR6 recipe (tropospheric adjustments, AR6 climate-carbon feedback and
         temperature response) to the scenario inputs. See ``ar6_prospective``.
     """
 
-    parameter_set: str = "legacy"
+    parameter_set: str = "ar6"
     climate_carbon_feedback: bool = True
     ccf_parameters: str = "gasser2017_mean"
     biogenic_oxidation_co2: str = "ar6"
@@ -88,6 +87,12 @@ class CharacterizationOptions:
     prospective_method: str = "watanabe2026"
 
     def __post_init__(self):
+        if self.parameter_set in _REMOVED_PARAMETER_SETS:
+            raise ValueError(
+                "parameter_set='legacy' was removed in dynamic_characterization 2.0; the default "
+                "characterization functions now follow the IPCC AR6 metrics. Use version 1.x for "
+                "the old functions."
+            )
         if self.parameter_set in _RESERVED_PARAMETER_SETS:
             raise NotImplementedError(
                 f"parameter_set={self.parameter_set!r} is planned but not available yet."

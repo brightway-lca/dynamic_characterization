@@ -1,236 +1,58 @@
 """
-Absolute Global Warming Potential (AGWP) calculations.
+Prospective absolute global warming potentials (AGWP) of CO2, CH4 and N2O, in W m-2 yr kg-1.
 
-Based on Watanabe et al. (2026) equations using prospective RE and IRF.
-
-AGWP = integral_0^t RE(t') * IRF(t') dt'
-
-For CO2, both RE and IRF vary by scenario.
-For CH4/N2O, RE varies by scenario but IRF uses fixed lifetimes.
+Since version 2.0 these are computed with :mod:`.watanabe2026` (Barbosa Watanabe & Cherubini
+2026, with two errors of the published code corrected), for the scenario of
+``prospective.set_scenario()``. CH4 and N2O include their indirect effects and a
+climate-carbon feedback. The signatures are unchanged; horizons are limited to 100 years.
 """
 
 import warnings
 
-import numpy as np
-
-from .config import get_scenario
-from .data_loader import (
-    load_irf_ch4,
-    load_irf_co2,
-    load_irf_n2o,
-    load_re_ch4,
-    load_re_co2,
-    load_re_n2o,
+from ._common import (  # noqa: F401  (re-exported for backwards compatibility)
+    CONST_CH4,
+    CONST_CO2,
+    CONST_N2O,
+    M_AIR,
+    M_ATMOSPHERE,
+    M_CH4,
+    M_CO2,
+    M_N2O,
+    PPB_TO_KG_CH4,
+    PPB_TO_KG_CO2,
+    PPB_TO_KG_N2O,
+    _get_year_index,
+    _rcp_to_irf_key,
 )
+from .config import get_scenario
+from . import watanabe2026
 
-# Constants for unit conversion
-# Convert RE from W/m^2/ppb to W/m^2/kg
-# All RE values in Watanabe SI files are in W/m^2/ppb (including CO2)
-# 1 ppb gas = 1e-9 * (M_ATMOSPHERE / M_AIR) * M_gas in kg
-M_AIR = 28.97  # g/mol (average molar mass of dry air)
-M_ATMOSPHERE = 5.13252e18  # kg (total mass of atmosphere)
-
-# Molar masses (g/mol)
-M_CO2 = 44.01
-M_CH4 = 16.04
-M_N2O = 44.01
-
-# Conversion constants: ppb to kg
-# 1 ppb CO2 = 1e-9 * (M_ATMOSPHERE/M_AIR) * M_CO2 kg = 7.79e9 kg
-# CONST converts W/m^2/ppb to W/m^2/kg: multiply by ppb/kg
-PPB_TO_KG_CO2 = 1e-9 * M_ATMOSPHERE / M_AIR * M_CO2  # kg per ppb
-PPB_TO_KG_CH4 = 1e-9 * M_ATMOSPHERE / M_AIR * M_CH4  # kg per ppb
-PPB_TO_KG_N2O = 1e-9 * M_ATMOSPHERE / M_AIR * M_N2O  # kg per ppb
-
-CONST_CO2 = 1.0 / PPB_TO_KG_CO2  # ppb/kg (to convert RE from per-ppb to per-kg)
-CONST_CH4 = 1.0 / PPB_TO_KG_CH4  # ppb/kg
-CONST_N2O = 1.0 / PPB_TO_KG_N2O  # ppb/kg
+MAX_YEARS = 100
 
 
-def _get_year_index(emission_year: int, years: np.ndarray) -> int:
-    """
-    Get index for emission year in RE data, with clamping and warnings.
-
-    The bounds are taken from the RE data itself (currently 2020-2150), so they
-    follow the data instead of the narrower range reported in the paper tables.
-    """
-    min_year, max_year = int(years[0]), int(years[-1])
-
-    if emission_year < min_year:
-        warnings.warn(
-            f"Emission year {emission_year} < {min_year}, clamping to {min_year}"
-        )
-        emission_year = min_year
-    elif emission_year > max_year:
-        warnings.warn(
-            f"Emission year {emission_year} > {max_year}, clamping to {max_year}"
-        )
-        emission_year = max_year
-
-    # Find index in years array
-    idx = np.searchsorted(years, emission_year)
-    return idx
-
-
-def _rcp_to_irf_key(rcp: str) -> str:
-    """Convert RCP string (e.g., '2.6') to IRF dict key (e.g., 'RCP26')."""
-    return f"RCP{rcp.replace('.', '')}"
-
-
-def agwp_co2(
-    emission_year: int,
-    time_horizon: int = 100,
-    time_varying_re: bool = False,
-) -> float:
-    """
-    Calculate AGWP for 1 kg CO2.
-
-    Parameters
-    ----------
-    emission_year : int
-        Year of emission (2020-2150, clamped if outside)
-    time_horizon : int
-        Integration period in years
-    time_varying_re : bool
-        If True, use RE that evolves over the decay period.
-        If False, use fixed RE from emission year (IPCC standard).
-
-    Returns
-    -------
-    float
-        AGWP in W*yr/m^2/kg
-    """
+def _value(gas: str, metric: str, emission_year: int, time_horizon: int, time_varying_re: bool) -> float:
+    if time_horizon <= 0:
+        return 0.0
+    if time_horizon > MAX_YEARS:
+        warnings.warn(f"Time horizon {time_horizon} > {MAX_YEARS} years, truncated to {MAX_YEARS}.")
+        time_horizon = MAX_YEARS
     scenario = get_scenario()
-    iam, ssp, rcp = scenario["iam"], scenario["ssp"], scenario["rcp"]
-
-    # Load data
-    re_data = load_re_co2(iam)
-    irf_data = load_irf_co2()
-
-    years = re_data["_years"]
-    re_series = re_data[ssp][rcp]  # W/m^2/ppb
-    irf_series = irf_data[_rcp_to_irf_key(rcp)]
-
-    year_idx = _get_year_index(emission_year, years)
-
-    # Limit time horizon to available IRF data
-    max_years = min(time_horizon, len(irf_series))
-
-    agwp = 0.0
-    for t in range(max_years):
-        irf_t = irf_series[t]
-
-        if time_varying_re:
-            # RE evolves: use RE at emission_year + t
-            re_idx = min(year_idx + t, len(re_series) - 1)
-            re_t = re_series[re_idx]
-        else:
-            # Fixed RE from emission year
-            re_t = re_series[year_idx]
-
-        # AGWP contribution: RE * IRF * conversion * dt (dt=1 year)
-        agwp += re_t * irf_t * CONST_CO2
-
-    return agwp
+    series = watanabe2026.scenario_series(
+        gas, metric, scenario["iam"], scenario["ssp"], scenario["rcp"], int(emission_year), bool(time_varying_re)
+    )
+    return float(series[int(time_horizon) - 1])
 
 
-def agwp_ch4(
-    emission_year: int,
-    time_horizon: int = 100,
-    time_varying_re: bool = False,
-) -> float:
-    """
-    Calculate AGWP for 1 kg CH4.
-
-    Parameters
-    ----------
-    emission_year : int
-        Year of emission (2020-2150, clamped if outside)
-    time_horizon : int
-        Integration period in years
-    time_varying_re : bool
-        If True, use RE that evolves over the decay period.
-
-    Returns
-    -------
-    float
-        AGWP in W*yr/m^2/kg
-    """
-    scenario = get_scenario()
-    iam, ssp, rcp = scenario["iam"], scenario["ssp"], scenario["rcp"]
-
-    # Load data
-    re_data = load_re_ch4(iam)
-    irf_series = load_irf_ch4()
-
-    years = re_data["_years"]
-    re_series = re_data[ssp][rcp]  # W/m^2/ppb
-
-    year_idx = _get_year_index(emission_year, years)
-
-    max_years = min(time_horizon, len(irf_series))
-
-    agwp = 0.0
-    for t in range(max_years):
-        irf_t = irf_series[t]
-
-        if time_varying_re:
-            re_idx = min(year_idx + t, len(re_series) - 1)
-            re_t = re_series[re_idx]
-        else:
-            re_t = re_series[year_idx]
-
-        agwp += re_t * irf_t * CONST_CH4
-
-    return agwp
+def agwp_co2(emission_year: int, time_horizon: int = 100, time_varying_re: bool = False) -> float:
+    """AGWP of 1 kg CO2 emitted in ``emission_year`` (2020-2150, clamped outside)."""
+    return _value("CO2", "agwp", emission_year, time_horizon, time_varying_re)
 
 
-def agwp_n2o(
-    emission_year: int,
-    time_horizon: int = 100,
-    time_varying_re: bool = False,
-) -> float:
-    """
-    Calculate AGWP for 1 kg N2O.
+def agwp_ch4(emission_year: int, time_horizon: int = 100, time_varying_re: bool = False) -> float:
+    """AGWP of 1 kg CH4, incl. ozone, stratospheric water vapour and climate-carbon feedback."""
+    return _value("CH4", "agwp", emission_year, time_horizon, time_varying_re)
 
-    Parameters
-    ----------
-    emission_year : int
-        Year of emission (2020-2150, clamped if outside)
-    time_horizon : int
-        Integration period in years
-    time_varying_re : bool
-        If True, use RE that evolves over the decay period.
 
-    Returns
-    -------
-    float
-        AGWP in W*yr/m^2/kg
-    """
-    scenario = get_scenario()
-    iam, ssp, rcp = scenario["iam"], scenario["ssp"], scenario["rcp"]
-
-    # Load data
-    re_data = load_re_n2o(iam)
-    irf_series = load_irf_n2o()
-
-    years = re_data["_years"]
-    re_series = re_data[ssp][rcp]  # W/m^2/ppb
-
-    year_idx = _get_year_index(emission_year, years)
-
-    max_years = min(time_horizon, len(irf_series))
-
-    agwp = 0.0
-    for t in range(max_years):
-        irf_t = irf_series[t]
-
-        if time_varying_re:
-            re_idx = min(year_idx + t, len(re_series) - 1)
-            re_t = re_series[re_idx]
-        else:
-            re_t = re_series[year_idx]
-
-        agwp += re_t * irf_t * CONST_N2O
-
-    return agwp
+def agwp_n2o(emission_year: int, time_horizon: int = 100, time_varying_re: bool = False) -> float:
+    """AGWP of 1 kg N2O, incl. ozone, its CH4 effect and climate-carbon feedback."""
+    return _value("N2O", "agwp", emission_year, time_horizon, time_varying_re)

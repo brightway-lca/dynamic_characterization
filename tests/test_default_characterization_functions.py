@@ -207,4 +207,18 @@ def test_dynamic_gwp100_matches_static_score():
         fixed_time_horizon=False,
     )
 
-    assert np.isclose(characterized.amount.sum(), static_score, rtol=0.05)
+    # the default functions reproduce the AR6 metrics, i.e. the static IPCC 2021 factors
+    assert np.isclose(characterized.amount.sum(), static_score, rtol=0.01)
+
+
+def test_public_names_are_the_ar6_functions():
+    """The names of earlier versions are kept and point to the AR6 functions."""
+    from dynamic_characterization import ipcc_ar6
+    from dynamic_characterization.ipcc_ar6.radiative_forcing import characterize_co2_ar6
+
+    co2 = ipcc_ar6.characterize_co2.agwp(100)
+    assert ipcc_ar6.characterize_co2 is characterize_co2_ar6
+    assert ipcc_ar6.characterize_ch4.agwp(100) / co2 == pytest.approx(29.8, rel=0.005)  # fossil CH4
+    assert ipcc_ar6.characterize_n2o.agwp(100) / co2 == pytest.approx(273, rel=0.005)
+    assert ipcc_ar6.characterize_co.agwp(100) / co2 == pytest.approx(3.20, abs=0.01)  # fossil CO, all effects
+    assert ipcc_ar6.characterize_co2_uptake.agwp(100) == pytest.approx(-co2)

@@ -3,8 +3,6 @@ Barbosa Watanabe & Cherubini (2026), doi:10.1021/acs.est.5c12391, with two error
 published code corrected: ``prospective.watanabe2026`` and the default "watanabe2026" method of
 the "ar6" parameter set with the prospective metrics.
 
-Imports must stay at module level and this module must sort before test_prospective.py, which
-replaces `dynamic_characterization` in sys.modules when it is collected.
 """
 
 import os

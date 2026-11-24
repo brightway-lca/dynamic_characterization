@@ -2,8 +2,6 @@
 
 The default method "watanabe2026" is tested in test_paper_watanabe2026.py.
 
-Imports must stay at module level and this module must sort before test_prospective.py, which
-replaces `dynamic_characterization` in sys.modules when it is collected.
 """
 
 import bw2data as bd
@@ -214,10 +212,17 @@ def test_fallback_to_ipcc_false_keeps_only_scenario_gases():
 
 
 @bw2test
-def test_unsupported_settings_raise():
+def test_time_varying_re_and_long_horizons():
+    """The "ar6" method ignores time_varying_re (with a warning); horizons > 100 yr are truncated."""
     ids = setup_project()
     set_scenario(iam="MESSAGE", ssp="SSP2", rcp="4.5")
-    with pytest.raises(NotImplementedError, match="time_varying_re"):
-        characterize(inventory(ids), metric="pGWP", base_lcia_method=METHOD, time_varying_re=True, characterization_options=AR6)
-    with pytest.raises(ValueError, match="up to 100 years"):
-        characterize(inventory(ids), metric="pGWP", base_lcia_method=METHOD, time_horizon=150, characterization_options=AR6)
+    plain = characterize(inventory(ids), metric="pGWP", base_lcia_method=METHOD, characterization_options=AR6)
+    ar6_prospective._WARNED.clear()
+    with pytest.warns(UserWarning, match="time_varying_re"):
+        varying = characterize(
+            inventory(ids), metric="pGWP", base_lcia_method=METHOD, time_varying_re=True, characterization_options=AR6
+        )
+    pd.testing.assert_frame_equal(plain, varying)
+    with pytest.warns(UserWarning, match="truncated"):
+        long = characterize(inventory(ids), metric="pGWP", base_lcia_method=METHOD, time_horizon=150, characterization_options=AR6)
+    pd.testing.assert_frame_equal(plain, long)

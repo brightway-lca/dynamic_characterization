@@ -1,10 +1,8 @@
 import inspect
-import json
-import os
-import warnings
 from collections import namedtuple
 from collections.abc import Collection
 from datetime import datetime
+from functools import lru_cache
 from typing import Callable, Dict, Tuple
 from loguru import logger
 
@@ -16,64 +14,19 @@ from bw2data.utils import UnknownObject
 from dynamic_characterization import ar6_prospective
 from dynamic_characterization.ar6_dispatch import build_functions as build_ar6_functions
 from dynamic_characterization.classes import CharacterizedRow
-from dynamic_characterization.flows import build_cas_index, is_co2_uptake, normalize_cas
-from dynamic_characterization.ipcc_ar6.radiative_forcing import (
-    characterize_ch4,
-    characterize_co,
-    characterize_co2,
-    characterize_co2_uptake,
-    characterize_n2o,
-    create_generic_characterization_function,
-)
-from dynamic_characterization.ipcc_ar6.radiative_forcing import characterize_co2_ar6
+from dynamic_characterization.ipcc_ar6.radiative_forcing import characterize_co2
 from dynamic_characterization.options import CharacterizationOptions
-from dynamic_characterization.prospective import agwp, agtp
-from dynamic_characterization.prospective.radiative_forcing import (
-    characterize_ch4 as prospective_characterize_ch4,
-    characterize_co2 as prospective_characterize_co2,
-    characterize_co2_uptake as prospective_characterize_co2_uptake,
-    characterize_n2o as prospective_characterize_n2o,
-)
+from dynamic_characterization.prospective import watanabe2026
 
-
-# Characterization functions from the Watanabe module. These are the only ones that
-# accept the `time_varying_re` argument.
-_PROSPECTIVE_CHARACTERIZATION_FUNCTIONS = (
-    prospective_characterize_co2,
-    prospective_characterize_co2_uptake,
-    prospective_characterize_ch4,
-    prospective_characterize_n2o,
-)
-
-# Building the default characterization functions reloads decay_multipliers.json and
-# issues one biosphere DB query per method flow. The result only depends on the BW
-# project, the method, and the boolean flags, so it is memoized across calls.
+# Building the default characterization functions issues one biosphere DB query per method flow.
+# The result only depends on the BW project, the method, and the options, so it is memoized
+# across calls.
 _CHARACTERIZATION_FUNCTION_CACHE = {}
 
 
 def clear_characterization_function_cache() -> None:
     """Clear the memoized default characterization functions (e.g. after editing a method)."""
     _CHARACTERIZATION_FUNCTION_CACHE.clear()
-
-
-_DEFAULT_PARAMETER_SET_WARNED = False
-
-
-def _warn_default_parameter_set() -> None:
-    """Warn once per process that the default parameter set will change."""
-    global _DEFAULT_PARAMETER_SET_WARNED
-    if _DEFAULT_PARAMETER_SET_WARNED:
-        return
-    _DEFAULT_PARAMETER_SET_WARNED = True
-    warnings.warn(
-        "The default characterization functions use parameter_set='legacy', which differs from "
-        "the IPCC AR6 metrics (e.g. fossil CH4 GWP100 26.7 instead of 29.8). The default will "
-        "change to 'ar6' in dynamic_characterization 2.0. Pass "
-        "characterization_options={'parameter_set': 'ar6'} to use the AR6 functions now, or "
-        "{'parameter_set': 'legacy'} to keep the current ones and silence this warning.",
-        FutureWarning,
-        stacklevel=3,
-    )
 
 
 def characterize(
@@ -94,11 +47,13 @@ def characterize(
     Characterizes the dynamic inventory, formatted as a Dataframe, by evaluating each emission (row in DataFrame) using given dynamic characterization functions.
 
     Available metrics are radiative forcing [W/m2] and GWP [kg CO2eq], defaulting to `radiative_forcing`.
-    Additional prospective metrics pGWP, pGTP, and prospective_radiative_forcing use Watanabe et al. (2026)
-    scenario-based characterization factors. For these, set the scenario first via prospective.set_scenario().
+    The prospective metrics pGWP, pGTP and prospective_radiative_forcing follow a future scenario
+    (Barbosa Watanabe & Cherubini 2026); set it first with ``prospective.set_scenario()``.
 
-    In case users don't provide own dynamic characterization functions, it adds dynamic characterization functions from the timex submodule
-    for the GHGs mentioned in the IPCC AR6 Chapter 7, if these GHG are also characterized in the selected static LCA method.
+    If no characterization functions are given, default ones are built for the flows of
+    ``base_lcia_method``: the IPCC AR6 emission metrics (WG1 Ch. 7) for CO2, CH4, N2O and the
+    halocarbons, incl. the climate-carbon feedback and the CO2 from fossil-CH4 oxidation, plus the
+    indirect effects of CO, VOC and H2 (see ``characterization_options`` and the documentation).
 
     This method applies the dynamic characterization functions to each row of the dynamic_inventory_df for the duration of `time_horizon`, defaulting to 100 years.
     The `fixed_time_horizon` parameter determines whether the evaluation time horizon for all emissions is calculated from the
@@ -114,9 +69,10 @@ def characterize(
         The metric for which the dynamic LCIA should be calculated. Available: "radiative_forcing", "GWP", "pGWP", "pGTP", "prospective_radiative_forcing". Default is "radiative_forcing".
         - "radiative_forcing": Returns W/m2 time series using IPCC AR6 functions
         - "GWP": Returns kg CO2eq using IPCC AR6 functions
-        - "pGWP": Returns kg CO2eq using Watanabe et al. (2026) prospective GWP (requires scenario)
-        - "pGTP": Returns kg CO2eq using Watanabe et al. (2026) prospective GTP (requires scenario)
-        - "prospective_radiative_forcing": Returns W/m2 time series using Watanabe et al. (2026) functions (requires scenario)
+        - "pGWP": Returns kg CO2eq, prospective GWP (requires scenario)
+        - "pGTP": Returns kg CO2eq, prospective GTP (requires scenario)
+        - "prospective_radiative_forcing": Returns W/m2 time series for the scenario (requires scenario)
+        Prospective metrics cover at most 100 years; longer horizons are truncated with a warning.
     characterization_functions : dict, optional
         A dictionary of the form {biosphere_flow_id: dynamic_characterization_function} allowing users to specify their own functions and what flows to apply them to.
         Default is none, in which case a set of default functions are added based on the base_lcia_method.
@@ -132,24 +88,21 @@ def characterize(
     characterization_function_co2: Callable, optional
         Characterization function for CO2. This is required for the GWP calculation. If None is given, we try using timex' default CO2 function.
     time_varying_re: bool, optional
-        Only for prospective metrics (pGWP/pGTP/prospective_radiative_forcing). If True, use radiative efficiency that evolves over the decay period.
-        If False (default), use fixed RE from emission year (IPCC standard approach).
+        Only for prospective metrics (pGWP/pGTP/prospective_radiative_forcing). If True, the radiative efficiencies
+        of CO2, CH4 and N2O follow the scenario over the decay period. If False (default), those of the emission
+        year are used throughout (as in Watanabe & Cherubini 2026).
     fallback_to_ipcc: bool, optional
-        Only for prospective metrics. If True (default), use IPCC AR6 characterization functions for GHGs not available
-        in the Watanabe module (e.g., CO and other GHGs). If False, only GHGs available in Watanabe (CO2, CH4, N2O) are characterized.
+        Only for prospective metrics. If True (default), GHGs without scenario data (halocarbons, CO, VOC, H2, ...)
+        are characterized with their IPCC AR6 / literature functions. If False, only CO2, CH4 and N2O are characterized.
     characterize_biogenic_uptake: bool, optional
         Whether to characterize biogenic uptake flows (e.g. CO2 uptake by soil or biomass, or CDR processes).
         If True, the default characterization functions include uptake flows and these are characterized with a negative emission profile. Default is True.
         Set to False if you want to explicitly model uptake outside of the dynamic characterization (e.g. from a forest model)
     characterization_options: dict, optional
         Options for the default characterization functions, see
-        :class:`dynamic_characterization.options.CharacterizationOptions`. The most important one
-        is ``"parameter_set"``: ``"legacy"`` (default) or ``"ar6"``, which reproduces the IPCC AR6
-        metrics (e.g. ``{"parameter_set": "ar6"}``). With ``"ar6"`` and metric "GWP", the CO2
-        reference also uses the AR6 parameters. With the prospective metrics, the ``"ar6"``
-        functions follow the scenario: by default CO2, CH4 and N2O as in Watanabe & Cherubini
-        (2026), with two errors of the published code corrected (see ``ar6_prospective``; horizons
-        up to 100 years, no ``time_varying_re``).
+        :class:`dynamic_characterization.options.CharacterizationOptions`, e.g.
+        ``{"include_nox": True}``, ``{"climate_carbon_feedback": False}`` or, for the prospective
+        metrics, ``{"prospective_method": "ar6"}``.
 
     Returns
     -------
@@ -167,12 +120,6 @@ def characterize(
     use_prospective = metric in {"pGWP", "pGTP", "prospective_radiative_forcing"}
 
     options = CharacterizationOptions.from_value(characterization_options)
-    ar6 = options.parameter_set == "ar6"
-    if use_prospective and ar6 and time_varying_re:
-        raise NotImplementedError(
-            "time_varying_re=True is not available with parameter_set='ar6'; the radiative "
-            "efficiencies of the emission year are used."
-        )
 
     if not characterization_functions:
         logger.info(
@@ -194,9 +141,7 @@ def characterize(
         )
 
     if metric == "GWP" and not characterization_function_co2:
-        characterization_function_co2 = (
-            characterize_co2_ar6 if options.parameter_set == "ar6" else characterize_co2
-        )
+        characterization_function_co2 = characterize_co2
 
     # Fast path: for the (default) radiative_forcing metric without a fixed time
     # horizon, every row of a given flow uses the same characterization function
@@ -252,7 +197,6 @@ def characterize(
                     original_time_horizon=time_horizon,
                     dynamic_time_horizon=dynamic_time_horizon,
                     time_varying_re=time_varying_re,
-                    ar6=ar6,
                     options=options,
                 )
             )
@@ -265,7 +209,6 @@ def characterize(
                     original_time_horizon=time_horizon,
                     dynamic_time_horizon=dynamic_time_horizon,
                     time_varying_re=time_varying_re,
-                    ar6=ar6,
                     options=options,
                 )
             )
@@ -418,47 +361,32 @@ def create_characterization_functions_from_method(
     characterization_options: dict = None,
 ) -> dict:
     """
-    Add default dynamic characterization functions for CO2, CH4, N2O and other GHGs, based on IPCC
-    AR6 Chapter 7 decay curves. If use_prospective=True, uses Watanabe et al. (2026) functions
-    for CO2, CH4, and N2O (requires scenario to be set first).
+    Default dynamic characterization functions for the flows of a static LCIA method.
 
-    Please note the limitations of these default functions compared with the IPCC AR6 metrics:
-
-    - No climate-carbon feedback is included for any non-CO2 gas (CH4, N2O, CO, halocarbons).
-      AR6 adds it to all its metrics (Section 7.6.1.3; Gasser et al. 2017,
-      https://doi.org/10.5194/esd-8-235-2017), so dynamic GWPs come out about 4-5 % lower.
-    - All CH4 flows ("Methane, fossil", "Methane, non-fossil", "Methane, from soil or biomass
-      stock") share one function. The CO2 from the oxidation of fossil methane is not included.
-    - CO is characterized by its oxidation to CO2 only; its ozone and methane effects are not
-      included.
-    - Other GHGs are matched by CAS number to the Hodnebrog et al. (2020) data, without the
-      rapid adjustment AR6 applies to CFC-11 and CFC-12.
-    - The returned annual forcing sums to the absolute GWP at ``time_horizon - 1`` years (the
-      cumulative forcing is evaluated at years 0 ... H-1), which also applies to the CO2 reference
-      of the GWP metric.
+    The functions reproduce the IPCC AR6 emission metrics (WG1 Ch. 7, Tables 7.15 and 7.SM.7):
+    CO2, fossil and non-fossil CH4 (incl. oxidation CO2), N2O and all halocarbons of Table 7.SM.7,
+    with the climate-carbon feedback; CO, VOC and H2 include their indirect effects from published
+    parameter sets, NO/NOx optionally. Flows are matched by CAS number, then by exact name. With
+    ``use_prospective=True`` they follow the scenario of ``prospective.set_scenario()`` (CO2, CH4
+    and N2O after Barbosa Watanabe & Cherubini 2026). See the documentation for details.
 
     Parameters
     ----------
     base_lcia_method : tuple
         Tuple of the selected the LCIA method, e.g. `("EF v3.1", "climate change", "global warming potential (GWP100)")`.
     use_prospective : bool, optional
-        If True, use Watanabe et al. (2026) prospective characterization functions for CO2, CH4, N2O.
-        Default is False.
+        If True, the functions follow the prospective scenario (metrics pGWP, pGTP,
+        prospective_radiative_forcing). Default is False.
     fallback_to_ipcc : bool, optional
-        Only relevant when use_prospective=True. If True (default), use IPCC AR6 characterization functions
-        for GHGs not available in the Watanabe module (e.g., CO and other GHGs). If False, only GHGs
-        available in Watanabe (CO2, CH4, N2O) are characterized.
+        Only relevant when use_prospective=True. If True (default), GHGs without scenario data are
+        characterized with their IPCC AR6 / literature functions. If False, only CO2, CH4 and N2O are.
     characterize_uptake: bool, optional
         Whether to include characterization functions for biogenic uptake flows (e.g. CO2 uptake by soil or biomass, or CDR processes).
         If True (default), the default characterization functions include uptake. Set to False
         if you want to explicitly model uptake outside of the dynamic characterization (e.g. from a forest model)
     characterization_options: dict, optional
         Options for the default characterization functions, see
-        :class:`dynamic_characterization.options.CharacterizationOptions`. With
-        ``{"parameter_set": "ar6"}``, the functions reproduce the IPCC AR6 metrics and the
-        limitations listed above do not apply; CO, VOC and H2 then also include their indirect
-        effects (ozone, CH4, sulfate, stratospheric water vapour), and NO/NOx can be added.
-        Without options, ``"legacy"`` is used and a ``FutureWarning`` is issued once.
+        :class:`dynamic_characterization.options.CharacterizationOptions`.
 
     Returns
     -------
@@ -467,8 +395,6 @@ def create_characterization_functions_from_method(
 
     """
 
-    if characterization_options is None:
-        _warn_default_parameter_set()
     options = CharacterizationOptions.from_value(characterization_options)
 
     cache_key = (
@@ -482,22 +408,6 @@ def create_characterization_functions_from_method(
     cached = _CHARACTERIZATION_FUNCTION_CACHE.get(cache_key)
     if cached is not None:
         return cached
-
-    characterization_functions = dict()
-
-    filepath = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "ipcc_ar6",
-        "data",
-        "decay_multipliers.json",
-    )
-
-    with open(filepath, encoding="utf-8") as json_file:
-        decay_multipliers = json.load(json_file)
-
-    # The CAS numbers of biosphere flows and of the data keys are not formatted
-    # consistently (zero padding, stray whitespace), so both are normalised before matching.
-    decay_multipliers_by_cas = build_cas_index(decay_multipliers)
 
     # look up which GHGs are characterized in the selected static LCA method
     method_data = bd.Method(base_lcia_method).load()
@@ -531,67 +441,13 @@ def create_characterization_functions_from_method(
 
     bioflow_nodes = set(get_bioflow_node(identifier) for identifier, _ in method_data)
 
-    if options.parameter_set == "ar6":
-        characterization_functions = build_ar6_functions(
-            bioflow_nodes,
-            options,
-            characterize_uptake=characterize_uptake,
-            prospective=use_prospective,
-            fallback_to_ipcc=fallback_to_ipcc,
-        )
-        _CHARACTERIZATION_FUNCTION_CACHE[cache_key] = characterization_functions
-        return characterization_functions
-
-    # Select characterization functions based on whether prospective metrics are used
-    if use_prospective:
-        co2_func = prospective_characterize_co2
-        co2_uptake_func = prospective_characterize_co2_uptake
-        ch4_func = prospective_characterize_ch4
-        n2o_func = prospective_characterize_n2o
-    else:
-        co2_func = characterize_co2
-        co2_uptake_func = characterize_co2_uptake
-        ch4_func = characterize_ch4
-        n2o_func = characterize_n2o
-
-    for node in bioflow_nodes:
-        if "carbon dioxide" in node["name"].lower():
-            if is_co2_uptake(node):
-                if characterize_uptake:
-                    characterization_functions[node.id] = (
-                        co2_uptake_func  # negative emission because of uptake
-                    )
-                # else: uptake is modelled outside of the dynamic characterization,
-                # so these flows are intentionally left uncharacterized
-            else:
-                # all remaining CO2 flows are emissions, regardless of the air subcategory
-                characterization_functions[node.id] = co2_func
-
-        elif (
-            "methane, fossil" in node["name"].lower()
-            or "methane, non-fossil" in node["name"].lower()
-            or "methane, from soil or biomass stock" in node["name"].lower()
-        ):
-            characterization_functions[node.id] = ch4_func
-
-        elif "dinitrogen monoxide" in node["name"].lower():
-            characterization_functions[node.id] = n2o_func
-
-        elif "carbon monoxide" in node["name"].lower():
-            # CO is not available in Watanabe module, use IPCC if fallback is enabled
-            if not use_prospective or fallback_to_ipcc:
-                characterization_functions[node.id] = characterize_co
-
-        else:
-            # Other GHGs from decay_multipliers are not available in Watanabe module
-            if not use_prospective or fallback_to_ipcc:
-                key = decay_multipliers_by_cas.get(normalize_cas(node.get("CAS number")))
-                if key is not None:
-                    decay_series = decay_multipliers[key]
-                    if decay_series is not None:
-                        characterization_functions[node.id] = (
-                            create_generic_characterization_function(np.array(decay_series))
-                        )
+    characterization_functions = build_ar6_functions(
+        bioflow_nodes,
+        options,
+        characterize_uptake=characterize_uptake,
+        prospective=use_prospective,
+        fallback_to_ipcc=fallback_to_ipcc,
+    )
     _CHARACTERIZATION_FUNCTION_CACHE[cache_key] = characterization_functions
     return characterization_functions
 
@@ -636,20 +492,22 @@ def _calculate_dynamic_time_horizon(
         return time_horizon
 
 
+@lru_cache(maxsize=None)
+def _accepts_time_varying_re(char_func) -> bool:
+    try:
+        return "time_varying_re" in inspect.signature(char_func).parameters
+    except (TypeError, ValueError):
+        return False
+
+
 def _apply_characterization_function(
     char_func,
     row,
     time_horizon,
     time_varying_re: bool = False,
 ) -> CharacterizedRow:
-    """
-    Call a characterization function, passing `time_varying_re` only to those that accept it.
-
-    Flows that are not covered by the Watanabe module (e.g. CO and the GHGs from
-    decay_multipliers.json) are characterized with IPCC AR6 functions, which have no
-    `time_varying_re` parameter.
-    """
-    if char_func in _PROSPECTIVE_CHARACTERIZATION_FUNCTIONS:
+    """Call a characterization function, passing ``time_varying_re`` to those that accept it."""
+    if time_varying_re and _accepts_time_varying_re(char_func):
         return char_func(row, time_horizon, time_varying_re=time_varying_re)
     return char_func(row, time_horizon)
 
@@ -695,52 +553,24 @@ def _characterize_pgwp(
     original_time_horizon,
     dynamic_time_horizon,
     time_varying_re: bool = False,
-    ar6: bool = False,
     options: CharacterizationOptions = None,
 ) -> CharacterizedRow:
     """
-    Calculate prospective GWP using Watanabe et al. (2026) characterization.
-
-    Uses AGWP_gas / AGWP_CO2 to calculate kg CO2 equivalent.
-    Emission year is extracted from the row's date. With ``ar6=True`` the CO2 reference is the
-    AR6 CO2 pulse with the scenario CO2 response (``ar6_prospective``), in the same time
-    convention as the "ar6" functions.
+    Prospective GWP: the forcing of the emission summed over its (dynamic) time horizon, divided
+    by that of 1 kg CO2 in the same scenario and year over the original time horizon.
     """
-    # Get emission year from the row date
-    emission_date = row.date
-    emission_year = int(str(emission_date.to_numpy())[:4])
-
-    # Calculate AGWP for the gas using its characterization function
+    options = options or CharacterizationOptions()
     radiative_forcing_ghg = _apply_characterization_function(
         characterization_functions[row.flow],
         row,
         dynamic_time_horizon,
         time_varying_re=time_varying_re,
     )
-
-    # Calculate reference AGWP for 1 kg of CO2
-    if ar6:
-        options = options or CharacterizationOptions(parameter_set="ar6")
-        radiative_forcing_co2 = ar6_prospective.co2_function(options.prospective_method)(
-            row._replace(amount=1), original_time_horizon
-        )
-    else:
-        radiative_forcing_co2 = prospective_characterize_co2(
-            row._replace(amount=1),
-            original_time_horizon,
-            time_varying_re=time_varying_re,
-        )
-
-    ghg_integral = radiative_forcing_ghg.amount.sum()
-    co2_integral = radiative_forcing_co2.amount.sum()
-    co2_equiv = ghg_integral / co2_integral
-
-    return CharacterizedRow(
-        date=row.date,
-        amount=co2_equiv,
-        flow=row.flow,
-        activity=row.activity,
+    radiative_forcing_co2 = ar6_prospective.co2_function(options.prospective_method)(
+        row._replace(amount=1), original_time_horizon, time_varying_re=time_varying_re
     )
+    co2_equiv = radiative_forcing_ghg.amount.sum() / radiative_forcing_co2.amount.sum()
+    return CharacterizedRow(date=row.date, amount=co2_equiv, flow=row.flow, activity=row.activity)
 
 
 def _characterize_pgtp(
@@ -749,84 +579,22 @@ def _characterize_pgtp(
     original_time_horizon,
     dynamic_time_horizon,
     time_varying_re: bool = False,
-    ar6: bool = False,
     options: CharacterizationOptions = None,
 ) -> CharacterizedRow:
     """
-    Calculate prospective GTP using Watanabe et al. (2026) characterization.
-
-    Uses AGTP_gas / AGTP_CO2 to calculate kg CO2 equivalent.
-    Emission year is extracted from the row's date. With ``ar6=True``, the "ar6" functions give
-    their own AGTP (AR6 temperature response, scenario CO2 response), and the CO2 reference is
-    computed the same way.
+    Prospective GTP: AGTP of the emission at its (dynamic) time horizon, divided by the AGTP of
+    1 kg CO2 in the same scenario and year at the original time horizon.
     """
-    # Get emission year from the row date
-    emission_date = row.date
-    emission_year = int(str(emission_date.to_numpy())[:4])
-
-    # For GTP, we need to use the AGTP functions directly since they
-    # compute temperature change potential, not just integrated radiative forcing
-    # First, determine which gas we're dealing with based on the characterization function
+    options = options or CharacterizationOptions()
     char_func = characterization_functions[row.flow]
-
-    # Get the AGTP for this gas
-    if ar6:
-        options = options or CharacterizationOptions(parameter_set="ar6")
-        reference = ar6_prospective.co2_function(options.prospective_method)
-        if hasattr(char_func, "agtp_for"):
-            agtp_gas = char_func.agtp_for(row.date, dynamic_time_horizon)
-        else:  # a custom function: AGTP from its forcing, with the same temperature response
-            agtp_gas = _agtp_from_radiative_forcing(char_func, row, dynamic_time_horizon)
-            reference = None
-        if reference is not None:
-            co2_equiv = row.amount * agtp_gas / reference.agtp_for(row.date, original_time_horizon)
-            return CharacterizedRow(date=row.date, amount=co2_equiv, flow=row.flow, activity=row.activity)
-    if char_func in (prospective_characterize_co2, prospective_characterize_co2_uptake):
-        agtp_gas = agtp.agtp_co2(
-            emission_year=emission_year,
-            time_horizon=dynamic_time_horizon,
-            time_varying_re=time_varying_re,
-        )
-        # For CO2, pGTP = 1.0 by definition
-        if char_func == prospective_characterize_co2_uptake:
-            agtp_gas = -agtp_gas
-    elif char_func == prospective_characterize_ch4:
-        agtp_gas = agtp.agtp_ch4(
-            emission_year=emission_year,
-            time_horizon=dynamic_time_horizon,
-            time_varying_re=time_varying_re,
-        )
-    elif char_func == prospective_characterize_n2o:
-        agtp_gas = agtp.agtp_n2o(
-            emission_year=emission_year,
-            time_horizon=dynamic_time_horizon,
-            time_varying_re=time_varying_re,
-        )
+    reference = ar6_prospective.co2_function(options.prospective_method)
+    if hasattr(char_func, "agtp_for"):
+        agtp_gas = char_func.agtp_for(row.date, dynamic_time_horizon, time_varying_re=time_varying_re)
     else:
-        # GHGs outside the Watanabe module (IPCC AR6 fallback functions): AGTP from the
-        # function's radiative forcing, convolved with the same temperature response
-        agtp_gas = _agtp_from_radiative_forcing(
-            char_func,
-            row,
-            dynamic_time_horizon,
-            time_varying_re=time_varying_re,
-        )
-
-    # Calculate reference AGTP for 1 kg of CO2
-    agtp_co2 = agtp.agtp_co2(
-        emission_year=emission_year,
-        time_horizon=original_time_horizon,
-        time_varying_re=time_varying_re,
-    )
-
+        agtp_gas = _agtp_from_radiative_forcing(char_func, row, dynamic_time_horizon, time_varying_re=time_varying_re)
+    agtp_co2 = reference.agtp_for(row.date, original_time_horizon, time_varying_re=time_varying_re)
     co2_equiv = row.amount * agtp_gas / agtp_co2
-
-    return CharacterizedRow(
-        date=row.date,
-        amount=co2_equiv,
-        flow=row.flow,
-        activity=row.activity,
-    )
+    return CharacterizedRow(date=row.date, amount=co2_equiv, flow=row.flow, activity=row.activity)
 
 
 def _agtp_from_radiative_forcing(
@@ -836,35 +604,23 @@ def _agtp_from_radiative_forcing(
     time_varying_re: bool = False,
 ) -> float:
     """
-    AGTP at ``time_horizon`` [K per unit emission] from a characterization function's RF.
-
-    Used for pGTP of GHGs that the Watanabe module does not cover. If the function provides
-    its own ``agtp(time_horizon)``, that is used. Otherwise the function is evaluated for a
-    unit emission and its annual forcing is convolved with the temperature response of
-    ``prospective.agtp`` (the same model and discretisation as ``agtp.agtp_co2``, so that the
-    pGTP ratio is consistent).
-
-    Assumes the convention of the IPCC AR6 functions in this package: element ``k`` of the
-    marginal forcing is the forcing integrated over year ``[k-1, k]`` (element 0 is zero).
+    AGTP at ``time_horizon`` [K per unit emission] of a custom characterization function, for
+    pGTP. The function is evaluated for a unit emission and its annual forcing is passed through
+    the annual temperature model of ``prospective.watanabe2026`` (as for the CO2 reference). A
+    function that provides its own ``agtp(time_horizon)`` uses that instead.
     """
     if time_horizon <= 0:
         return 0.0
-
     own_agtp = getattr(char_func, "agtp", None)
     if callable(own_agtp):
         return float(own_agtp(time_horizon))
-
     marginal = np.asarray(
         _apply_characterization_function(
-            char_func,
-            row._replace(amount=1),
-            time_horizon + 1,
-            time_varying_re=time_varying_re,
+            char_func, row._replace(amount=1), time_horizon, time_varying_re=time_varying_re
         ).amount,
         dtype="float64",
     )
-    years = np.arange(1, len(marginal))  # end of each forcing year
-    return float(np.sum(marginal[1:] * agtp._temperature_response(time_horizon - years)))
+    return float(watanabe2026.agtp_from_rf(marginal)[time_horizon - 1])
 
 
 def _characterize_prospective_radiative_forcing(
@@ -873,13 +629,7 @@ def _characterize_prospective_radiative_forcing(
     time_horizon,
     time_varying_re: bool = False,
 ) -> CharacterizedRow:
-    """
-    Calculate prospective radiative forcing using Watanabe et al. (2026) characterization.
-
-    For GHGs available in Watanabe (CO2, CH4, N2O), uses scenario-based radiative
-    efficiencies; for CO2 the impulse response function is scenario-based as well.
-    For other GHGs (when fallback_to_ipcc=True), uses standard IPCC AR6 functions.
-    """
+    """Prospective radiative forcing of an emission (functions built with use_prospective=True)."""
     return _apply_characterization_function(
         characterization_functions[row.flow],
         row,
@@ -927,7 +677,7 @@ def compare_with_static(
         characterize_uptake=characterize_uptake,
         characterization_options=options,
     )
-    co2_function = characterize_co2_ar6 if options.parameter_set == "ar6" else characterize_co2
+    co2_function = characterize_co2
 
     unit = _VectorizationRow(date=pd.Timestamp("2020-01-01"), amount=1.0, flow=None, activity=None)
     co2_integral = co2_function(unit, time_horizon).amount.sum()

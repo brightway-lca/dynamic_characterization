@@ -17,12 +17,17 @@ each emission. Two methods (option ``prospective_method``):
     use the scenario direct RE with the AR6 tropospheric adjustments and indirect terms, and the
     temperature response is the AR6 one.
 
-The scenario CO2 impulse response covers 100 years, so do these metrics.
+The scenario CO2 impulse response covers 100 years, so do these metrics: longer horizons are
+truncated to 100 years, with a warning. ``time_varying_re=True`` lets the radiative
+efficiencies of CO2, CH4 and N2O follow the scenario over the response (``"watanabe2026"`` only;
+the ``"ar6"`` method uses those of the emission year and warns).
 """
 
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Optional, Tuple
+
+import warnings
 
 import numpy as np
 
@@ -36,7 +41,7 @@ from dynamic_characterization.prospective.data_loader import (
     load_re_co2,
     load_re_n2o,
 )
-from dynamic_characterization.prospective.radiative_forcing import CONST_CO2, _get_year_index
+from dynamic_characterization.prospective._common import CONST_CO2, _get_year_index
 
 METHODS = ("watanabe2026", "ar6")
 MAX_YEARS = 100
@@ -112,21 +117,42 @@ class Recipe:
         return self.spec.name if self.spec is not None else self.kind
 
 
-def _check_period(period: float) -> None:
+_WARNED = set()
+
+
+def _warn_once(key: str, message: str) -> None:
+    if key not in _WARNED:
+        _WARNED.add(key)
+        warnings.warn(message, UserWarning, stacklevel=3)
+
+
+def _truncated(period) -> int:
+    """The horizon actually characterized: at most 100 years (with a one-time warning)."""
     if period > MAX_YEARS:
-        raise ValueError(
-            f"parameter_set='ar6' with a prospective scenario covers time horizons up to {MAX_YEARS} "
-            f"years (the length of the scenario CO2 impulse response), not {period}."
+        _warn_once(
+            "horizon",
+            f"Prospective characterization covers {MAX_YEARS} years (the length of the scenario CO2 "
+            f"impulse response); time horizons beyond that are truncated to {MAX_YEARS} years.",
         )
+        return MAX_YEARS
+    return int(period)
 
 
 @lru_cache(maxsize=None)
-def _annual(recipe: Recipe, iam: str, ssp: str, rcp: str, year: int):
+def _annual(recipe: Recipe, iam: str, ssp: str, rcp: str, year: int, time_varying_re: bool = False):
     """(cumulative AGWP at the end of years 1..100, AGTP at years 1..100), per kg."""
     if recipe.kind == "paper":
-        agwp = recipe.sign * watanabe2026.scenario_series(recipe.gas, "agwp", iam, ssp, rcp, year)[:MAX_YEARS]
-        agtp = recipe.sign * watanabe2026.scenario_series(recipe.gas, "agtp", iam, ssp, rcp, year)[:MAX_YEARS]
+        agwp = recipe.sign * watanabe2026.scenario_series(recipe.gas, "agwp", iam, ssp, rcp, year, time_varying_re)[:MAX_YEARS]
+        agtp = recipe.sign * watanabe2026.scenario_series(recipe.gas, "agtp", iam, ssp, rcp, year, time_varying_re)[:MAX_YEARS]
         return np.asarray(agwp), np.asarray(agtp)
+    if time_varying_re:
+        if recipe.method == "ar6":
+            _warn_once(
+                "time_varying_re",
+                "time_varying_re is not supported by prospective_method='ar6'; the radiative "
+                "efficiencies of the emission year are used.",
+            )
+        time_varying_re = False
     spec = recipe.spec_for(iam, ssp, rcp, year)
     response = scenario_co2_response(iam, ssp, rcp, year, recipe.method)
     agwp = ar6_core.annual_cumulative(spec, MAX_YEARS, response)
@@ -149,12 +175,14 @@ def make_prospective_function(recipe: Recipe):
     horizon. ``.agwp_for(date, H)`` and ``.agtp_for(date, H)`` give the per-kg metrics.
     """
 
-    def annual(date):
-        return _annual(recipe, *_current_scenario(), _emission_year(date))
+    def annual(date, time_varying_re=False):
+        return _annual(recipe, *_current_scenario(), _emission_year(date), bool(time_varying_re))
 
-    def characterize_ar6_prospective(series, period: int = 100, cumulative: bool = False) -> CharacterizedRow:
-        _check_period(period)
-        agwp, _ = annual(series.date)
+    def characterize_ar6_prospective(
+        series, period: int = 100, cumulative: bool = False, time_varying_re: bool = False
+    ) -> CharacterizedRow:
+        period = _truncated(period)
+        agwp, _ = annual(series.date, time_varying_re)
         date_beginning: np.datetime64 = series.date.to_numpy()
         dates = date_beginning + np.arange(start=0, stop=period, dtype="timedelta64[Y]").astype("timedelta64[s]")
         forcing = np.array(series.amount * agwp[:period], dtype="float64")
@@ -164,13 +192,13 @@ def make_prospective_function(recipe: Recipe):
             date=np.array(dates, dtype="datetime64[s]"), amount=forcing, flow=series.flow, activity=series.activity
         )
 
-    def agwp_for(date, time_horizon) -> float:
-        _check_period(time_horizon)
-        return float(annual(date)[0][int(time_horizon) - 1]) if time_horizon >= 1 else 0.0
+    def agwp_for(date, time_horizon, time_varying_re: bool = False) -> float:
+        horizon = _truncated(time_horizon)
+        return float(annual(date, time_varying_re)[0][horizon - 1]) if horizon >= 1 else 0.0
 
-    def agtp_for(date, time_horizon) -> float:
-        _check_period(time_horizon)
-        return float(annual(date)[1][int(time_horizon) - 1]) if time_horizon >= 1 else 0.0
+    def agtp_for(date, time_horizon, time_varying_re: bool = False) -> float:
+        horizon = _truncated(time_horizon)
+        return float(annual(date, time_varying_re)[1][horizon - 1]) if horizon >= 1 else 0.0
 
     characterize_ar6_prospective.__name__ = f"characterize_ar6_prospective[{recipe.label}, {recipe.method}]"
     characterize_ar6_prospective.__qualname__ = characterize_ar6_prospective.__name__
