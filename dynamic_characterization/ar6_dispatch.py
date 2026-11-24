@@ -75,7 +75,7 @@ def origin_from_name(name: str) -> Optional[str]:
 
 def classify_flow(node, options: Optional[CharacterizationOptions] = None) -> FlowClass:
     """Species and origin of a biosphere flow, for the ``"ar6"`` default functions."""
-    options = options or CharacterizationOptions(parameter_set="ar6")
+    options = options or CharacterizationOptions()
     name = (node.get("name") or "").strip()
     origin = origin_from_name(name)
     cas = normalize_cas(node.get("CAS number"))

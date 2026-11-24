@@ -181,7 +181,7 @@ def test_option_validation():
 
 # --- flows of the ecoinvent IPCC 2021 "incl. SLCFs" methods ---------------------------------
 
-AR6 = {"parameter_set": "ar6"}
+AR6 = {}  # the default options
 METHOD = ("test", "IPCC 2021", "incl. SLCFs")
 BIOFLOWS = {
     # name, CAS, static GWP100 of ecoinvent 3.12 IPCC 2021 incl. SLCFs

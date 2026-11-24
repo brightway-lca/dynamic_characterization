@@ -175,6 +175,8 @@ function names) but changes the results:
   about 18–20 to about 30). `prospective.agwp`, `prospective.agtp` and
   `prospective.radiative_forcing` keep their signatures. Horizons beyond 100 years are truncated
   with a warning, as before.
-- **Removed**: the 1.x functions and their data (`ipcc_ar6/data/decay_multipliers.json`), and the
-  `"legacy"` parameter set of 1.5 (`characterization_options={"parameter_set": "legacy"}` raises;
-  `"ar6"` is accepted and has no effect).
+- **Removed**: the 1.x functions and their data (`ipcc_ar6/data/decay_multipliers.json`).
+- **New**: `characterization_options` (all optional; see the tables above),
+  `compare_with_static`, the modules `ipcc_ar6.ar6_core`, `ipcc_ar6.gases`,
+  `prospective.watanabe2026`, and fixes of the CAS lookup and of pGTP for gases without scenario
+  data.

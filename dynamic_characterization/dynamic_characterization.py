@@ -660,7 +660,7 @@ def compare_with_static(
     time_horizon : int, optional
         Time horizon of the dynamic GWP in years. Default 100.
     characterization_options : dict, optional
-        As for :func:`characterize`, e.g. ``{"parameter_set": "ar6"}``.
+        As for :func:`characterize`, e.g. ``{"include_nox": True}``.
     characterize_uptake : bool, optional
         As for :func:`create_characterization_functions_from_method`.
 

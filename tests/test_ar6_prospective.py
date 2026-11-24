@@ -21,8 +21,8 @@ from dynamic_characterization.options import CharacterizationOptions
 from dynamic_characterization.prospective import set_scenario
 
 CCF = ar6_core.ccf_parameters()
-AR6 = {"parameter_set": "ar6", "prospective_method": "ar6"}
-OPTIONS = CharacterizationOptions(parameter_set="ar6", prospective_method="ar6")
+AR6 = {"prospective_method": "ar6"}
+OPTIONS = CharacterizationOptions(prospective_method="ar6")
 DATE = pd.Timestamp("2030-01-01")
 
 
@@ -104,7 +104,7 @@ def test_ch4_and_n2o_follow_the_scenario(scenario):
 
 
 def test_gases_without_co2_terms_do_not_depend_on_the_scenario(scenario):
-    options = CharacterizationOptions(parameter_set="ar6", prospective_method="ar6", climate_carbon_feedback=False)
+    options = CharacterizationOptions(prospective_method="ar6", climate_carbon_feedback=False)
     cf4 = prospective_function("75-73-0", options=options)
     assert cf4.agwp_for(DATE, 100) == pytest.approx(float(ar6_core.agwp(gases.halocarbon("75-73-0"), 100.0)), rel=1e-12)
 

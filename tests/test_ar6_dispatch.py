@@ -1,4 +1,4 @@
-"""Default characterization functions with characterization_options={"parameter_set": "ar6"}."""
+"""Default characterization functions (IPCC AR6) built from a static LCIA method."""
 
 import warnings
 
@@ -19,7 +19,7 @@ from dynamic_characterization.ipcc_ar6.radiative_forcing import (
     characterize_co2_uptake_ar6,
 )
 
-AR6 = {"parameter_set": "ar6"}
+AR6 = {}  # the default options
 METHOD = ("test", "IPCC 2021", "GWP100")
 
 # name, categories, type, CAS, static GWP100 (ecoinvent IPCC 2021 / AR6 Table 7.15 and 7.SM.7)
@@ -72,15 +72,10 @@ def test_compare_with_static_matches_ar6_factors():
         assert table.loc[ids[code], "dynamic_gwp"] == pytest.approx(static, rel=0.01, abs=1e-3), code
 
 
-@bw2test
-def test_defaults_are_the_ar6_set():
-    """Without options, the functions are those of {"parameter_set": "ar6"} (the only set since 2.0)."""
-    setup_project()
-    default = compare_with_static(METHOD, 100)
-    explicit = compare_with_static(METHOD, 100, AR6)
-    pd.testing.assert_frame_equal(default, explicit)
-    with pytest.raises(ValueError, match="legacy"):
-        create_characterization_functions_from_method(METHOD, characterization_options={"parameter_set": "legacy"})
+def test_parameter_set_is_not_an_option():
+    """The AR6 functions are the only ones since 2.0; there is no parameter set to choose."""
+    with pytest.raises(ValueError, match="Unknown characterization option"):
+        CharacterizationOptions.from_value({"parameter_set": "ar6"})
 
 
 @bw2test
@@ -190,10 +185,6 @@ def test_option_validation():
     with pytest.raises(ValueError, match="Unknown characterization option"):
         CharacterizationOptions.from_value({"parameterset": "ar6"})
     with pytest.raises(ValueError):
-        CharacterizationOptions.from_value({"parameter_set": "ar7"})
-    with pytest.raises(ValueError):
         CharacterizationOptions.from_value({"ch4_oxidation_yield": 1.5})
-    with pytest.raises(NotImplementedError):
-        CharacterizationOptions.from_value({"parameter_set": "fair_irf"})
-    assert CharacterizationOptions.from_value(AR6) == CharacterizationOptions(parameter_set="ar6")
+    assert CharacterizationOptions.from_value(AR6) == CharacterizationOptions()
     assert hash(CharacterizationOptions.from_value(dict(AR6, flow_overrides={1: {"origin": "fossil"}})))

@@ -14,7 +14,7 @@ Characterization functions based on [IPCC AR6 Chapter 7](https://doi.org/10.1017
 
 ## AR6 parameter set
 
-Pulse responses behind `characterization_options={"parameter_set": "ar6"}`.
+Pulse responses behind the default characterization functions.
 
 ::: dynamic_characterization.ipcc_ar6.ar6_core
 

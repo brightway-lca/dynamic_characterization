@@ -112,7 +112,7 @@ def test_years_outside_the_data_are_clamped():
 
 # --- through characterize() with the "ar6" parameter set ------------------------------------
 
-AR6 = {"parameter_set": "ar6"}
+AR6 = {}  # the default options
 METHOD = ("test", "IPCC 2021", "prospective watanabe2026")
 BIOFLOWS = {
     "co2": ("Carbon dioxide, fossil", ("air",), "emission", "000124-38-9"),
@@ -205,4 +205,4 @@ def test_the_two_methods_differ():
 
 def test_paper_code_option_is_gone():
     with pytest.raises(ValueError, match="Unknown characterization option"):
-        CharacterizationOptions.from_value({"parameter_set": "ar6", "prospective_paper_code": True})
+        CharacterizationOptions.from_value({"prospective_paper_code": True})

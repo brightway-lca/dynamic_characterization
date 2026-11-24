@@ -5,9 +5,6 @@ from typing import Mapping, Optional, Tuple
 
 from dynamic_characterization.ipcc_ar6.gases import precursor_parameter_set
 
-PARAMETER_SETS = ("ar6",)
-_REMOVED_PARAMETER_SETS = ("legacy",)
-_RESERVED_PARAMETER_SETS = ("fair_irf",)
 ORIGINS = ("fossil", "non-fossil")
 BIOGENIC_OXIDATION_MODES = ("ar6", "neutral", "explicit")
 CCF_PARAMETER_SETS = ("gasser2017_mean", "gasser2017_upper", "gasser2017_lower")
@@ -27,10 +24,6 @@ class CharacterizationOptions:
 
     Attributes
     ----------
-    parameter_set : {"ar6"}
-        The IPCC AR6 metrics (WG1 Ch. 7, Tables 7.15 and 7.SM.7), the only parameter set since
-        version 2.0; accepted for compatibility with 1.5. The ``"legacy"`` functions of versions
-        <= 1.5 were removed.
     climate_carbon_feedback : bool
         Add the climate-carbon feedback to non-CO2 gases. Default True (AR6).
     ccf_parameters : {"gasser2017_mean", "gasser2017_upper", "gasser2017_lower"}
@@ -72,7 +65,6 @@ class CharacterizationOptions:
         temperature response) to the scenario inputs. See ``ar6_prospective``.
     """
 
-    parameter_set: str = "ar6"
     climate_carbon_feedback: bool = True
     ccf_parameters: str = "gasser2017_mean"
     biogenic_oxidation_co2: str = "ar6"
@@ -87,17 +79,6 @@ class CharacterizationOptions:
     prospective_method: str = "watanabe2026"
 
     def __post_init__(self):
-        if self.parameter_set in _REMOVED_PARAMETER_SETS:
-            raise ValueError(
-                "parameter_set='legacy' was removed in dynamic_characterization 2.0; the default "
-                "characterization functions now follow the IPCC AR6 metrics. Use version 1.x for "
-                "the old functions."
-            )
-        if self.parameter_set in _RESERVED_PARAMETER_SETS:
-            raise NotImplementedError(
-                f"parameter_set={self.parameter_set!r} is planned but not available yet."
-            )
-        _check("parameter_set", self.parameter_set, PARAMETER_SETS)
         _check("ccf_parameters", self.ccf_parameters, CCF_PARAMETER_SETS)
         _check("biogenic_oxidation_co2", self.biogenic_oxidation_co2, BIOGENIC_OXIDATION_MODES)
         _check("unspecified_origin", self.unspecified_origin, ORIGINS)
